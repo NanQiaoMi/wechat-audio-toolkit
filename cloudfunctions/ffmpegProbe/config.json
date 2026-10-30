@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "openapi": [
+      "security.mediaCheckAsync"
+    ]
+  },
+  "triggers": [
+    {
+      "name": "dailyCleanup",
+      "type": "timer",
+      "config": "0 0 4 * * * *"
+    }
+  ]
+}

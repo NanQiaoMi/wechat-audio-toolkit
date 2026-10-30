@@ -1,0 +1,9 @@
+{
+  "name": "ffmpegProbe",
+  "version": "1.0.0",
+  "description": "路线 A 验证：云函数内运行静态 FFmpeg",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

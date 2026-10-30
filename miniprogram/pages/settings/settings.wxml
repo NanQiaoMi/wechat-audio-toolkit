@@ -1,0 +1,25 @@
+<view class="page">
+  <view class="card">
+    <view class="section-title">服务说明</view>
+    <view class="row"><text>单文件大小</text><text class="row-value">≤ 50MB</text></view>
+    <view class="row"><text>当前次数</text><text class="row-value">不限次数（测试阶段）</text></view>
+    <view class="row"><text>文件保留</text><text class="row-value">24 小时内自动清理</text></view>
+    <view class="hint">MP3 建议 ≤20 分钟，M4A/OGG/AAC 建议 ≤10 分钟，WAV/FLAC 可到 30 分钟。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">协议与隐私</view>
+    <view class="row link" bindtap="openPrivacyContract"><text>隐私保护指引</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="showAgreement"><text>用户协议</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="showCopyright"><text>版权与侵权投诉</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="showAbout"><text>关于</text><text class="arrow">›</text></view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">数据管理</view>
+    <view class="row link" bindtap="clearHistory"><text>清空历史记录</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="clearCache"><text>清理本机缓存</text><text class="arrow">›</text></view>
+  </view>
+
+  <view class="footer">v{{version}} · 音乐格式转换器</view>
+</view>

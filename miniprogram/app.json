@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/editor/editor",
+    "pages/settings/settings"
+  ],
+  "window": {
+    "backgroundColor": "#F8F6F2",
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#F8F6F2",
+    "navigationBarTitleText": "音频格式转换",
+    "navigationBarTextStyle": "black"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

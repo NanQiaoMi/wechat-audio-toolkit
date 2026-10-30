@@ -1,0 +1,525 @@
+<!-- miniprogram/pages/index/index.wxml -->
+<view class="app-container">
+
+  <!-- 1. 顶部极简品牌导航区 -->
+  <view class="header-nav">
+    <view class="brand-block">
+      <view class="brand-tag">
+        <text class="brand-dot"></text>
+        <text class="brand-tag-text">AUDIO CONVERT</text>
+      </view>
+      <text class="brand-title">音频格式转换</text>
+      <text class="brand-desc">无损互转 · 极速处理 · 微信原生一键分发</text>
+    </view>
+
+    <!-- 右侧胶囊快捷栏 (Apple Pill Style) -->
+    <view class="top-capsule-bar">
+      <view class="capsule-btn" bindtap="openHistoryModal">
+        <text class="capsule-icon">🕒</text>
+        <text class="capsule-text">历史</text>
+        <text wx:if="{{historyList.length > 0}}" class="capsule-badge">{{historyList.length}}</text>
+      </view>
+      <view class="capsule-divider"></view>
+      <view class="capsule-btn icon-only" bindtap="openSettings">
+        <text class="capsule-icon">⚙️</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 2. 音频剪辑工坊快捷入口条 (优雅轻量横幅) -->
+  <view class="quick-tool-banner" bindtap="goEditor">
+    <view class="tool-banner-left">
+      <text class="tool-banner-icon">✂️</text>
+      <view class="tool-banner-text">
+        <text class="tool-banner-title">音乐剪辑工坊</text>
+        <text class="tool-banner-sub">精准裁剪 · 片段合并 · 淡入淡出 · 音量平衡</text>
+      </view>
+    </view>
+    <view class="tool-banner-arrow">前往剪辑 ›</view>
+  </view>
+
+  <!-- 3. 主音频拾取 / 试听面板 (Hero Card) -->
+  <view class="card-panel hero-panel">
+    
+    <!-- 未选文件状态 (空状态) -->
+    <view wx:if="{{!sourceFile}}" class="upload-dropzone" bindtap="chooseAudioFile">
+      <view class="upload-disc-icon">
+        <view class="disc-groove">
+          <view class="disc-hole"></view>
+        </view>
+        <view class="disc-sparkle">🎵</view>
+      </view>
+
+      <text class="upload-main-title">点击选择音频文件</text>
+      <text class="upload-sub-title">直接从微信聊天、单聊、群聊或文件助手选取</text>
+
+      <view class="upload-action-pill">
+        <text class="action-pill-plus">+</text>
+        <text>选择音频 (≤ 50MB)</text>
+      </view>
+
+      <!-- 支持的格式标签 -->
+      <view class="support-format-tags">
+        <text class="format-mini-tag">MP3</text>
+        <text class="format-mini-tag">WAV</text>
+        <text class="format-mini-tag">FLAC</text>
+        <text class="format-mini-tag">M4A</text>
+        <text class="format-mini-tag">AAC</text>
+        <text class="format-mini-tag">OGG</text>
+        <text class="format-mini-tag">AMR</text>
+      </view>
+    </view>
+
+    <!-- 已选文件展示与播放器 -->
+    <view wx:else class="loaded-audio-view">
+      <!-- 顶部音频元数据行 -->
+      <view class="audio-meta-row">
+        <view class="meta-icon-box">🎶</view>
+        <view class="meta-content">
+          <text class="meta-file-name" title="{{sourceFile.name}}">{{sourceFile.name}}</text>
+          <view class="meta-badges">
+            <text class="pill-badge codec-badge">{{sourceFile.extName}}</text>
+            <text class="pill-badge size-badge">{{sourceFile.sizeText}}</text>
+            <text wx:if="{{sourceDuration > 0}}" class="pill-badge time-badge">{{sourceDurationText}}</text>
+          </view>
+        </view>
+        <view class="rechoose-btn-pill" bindtap="chooseAudioFile">
+          <text>重选 ↻</text>
+        </view>
+      </view>
+
+      <!-- 原生音频播放控制器 -->
+      <view class="player-container">
+        <view wx:if="{{sourcePlayable}}" class="inline-player">
+          <view class="player-play-btn {{isSourcePlaying ? 'playing' : ''}}" bindtap="togglePlaySource">
+            <text class="play-btn-icon">{{isSourcePlaying ? '⏸' : '▶'}}</text>
+          </view>
+          
+          <view class="player-progress-area">
+            <slider 
+              class="custom-slider" 
+              min="0" 
+              max="{{sourceDuration || 100}}" 
+              value="{{sourceCurrentTime}}" 
+              bindchange="onSourceSeek"
+              block-size="14"
+              activeColor="#FF6B00"
+              backgroundColor="#E7E5E4"
+            />
+            <view class="player-time-display">
+              <text class="time-item">{{sourceCurrentTimeText}}</text>
+              <text class="time-item">{{sourceDurationText}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 无法原生直接播放的格式提示 -->
+        <view wx:else class="unplayable-banner">
+          <text class="unplayable-icon">💡</text>
+          <text>当前为高规格无损或专用编码，转换后将支持原声直接试听</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 4. 目标格式选择器 (清晰宽敞的 6 宫格) -->
+  <view class="card-panel">
+    <view class="panel-header">
+      <view class="panel-title-group">
+        <text class="panel-title">选择目标格式</text>
+        <text class="panel-subtitle">6 种主流全能音频编码</text>
+      </view>
+      <text class="panel-badge-tip">即选即转</text>
+    </view>
+
+    <view class="format-grid-box">
+      <view 
+        wx:for="{{formats}}" 
+        wx:key="key" 
+        class="format-cell {{targetFormat === item.key ? 'selected' : ''}}" 
+        bindtap="selectTargetFormat" 
+        data-format="{{item.key}}"
+      >
+        <view class="cell-top">
+          <text class="cell-name">{{item.name}}</text>
+          <view wx:if="{{targetFormat === item.key}}" class="check-pill">✓</view>
+        </view>
+        <text class="cell-tag">{{item.badge}}</text>
+        <text class="cell-desc">{{item.desc}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 5. 智能音频压缩与音质调节控制台 (第一优先级压缩面板) -->
+  <view class="card-panel compression-panel">
+    <view class="panel-header compression-header">
+      <view class="panel-title-group">
+        <text class="panel-title">音频压缩 / 输出码率</text>
+        <text class="panel-subtitle">调节音质与体积 · 实时预估瘦身效果</text>
+      </view>
+      <view class="extreme-btn-pill" bindtap="quickExtremeCompress">
+        <text class="extreme-icon">⚡</text>
+        <text class="extreme-txt">极限压缩</text>
+      </view>
+    </view>
+
+    <!-- 可压缩格式 (MP3, M4A, AAC, OGG) -->
+    <block wx:if="{{isCompressibleFormat}}">
+      <!-- 预估瘦身体积看板 -->
+      <view class="compression-metrics-board">
+        <view class="metric-col orig">
+          <text class="metric-label">原始体积</text>
+          <text class="metric-value">{{sourceFile ? sourceFile.sizeText : '--'}}</text>
+        </view>
+        <view class="metric-arrow-badge">
+          <text class="metric-arrow">→</text>
+          <text class="save-badge-pill" wx:if="{{savedRatioText > 0}}">预计瘦身 {{savedRatioText}}%</text>
+        </view>
+        <view class="metric-col target">
+          <text class="metric-label">预计压缩至</text>
+          <text class="metric-value highlight">{{estimatedSizeText}}</text>
+        </view>
+      </view>
+
+      <!-- 当前选定档位说明条 -->
+      <view class="quality-grade-banner">
+        <view class="grade-tag">{{qualityGradeShort}}</view>
+        <text class="grade-desc">{{qualityGradeText}}</text>
+      </view>
+
+      <!-- 6档快捷比特率胶囊卡片网格 -->
+      <view class="bitrate-preset-grid">
+        <view 
+          wx:for="{{compressionOptionsList}}" 
+          wx:key="value" 
+          class="preset-pill-item {{compressionIndex === index ? 'active' : ''}}"
+          bindtap="selectBitrateIndex"
+          data-index="{{index}}"
+        >
+          <text class="preset-kbps">{{item.label}}</text>
+          <text class="preset-sub">{{item.sub}}</text>
+        </view>
+      </view>
+
+      <!-- 滑动连续调节条 -->
+      <view class="slider-control-row">
+        <text class="slider-boundary-label">极小 64k</text>
+        <slider 
+          class="compression-slider" 
+          min="0" 
+          max="5" 
+          step="1" 
+          value="{{compressionIndex}}" 
+          activeColor="#FF6B00" 
+          backgroundColor="#E7E5E4" 
+          block-size="20" 
+          block-color="#1C1917"
+          bindchange="onBitrateSliderChange"
+          bindchanging="onBitrateSliderChanging"
+        />
+        <text class="slider-boundary-label">母带 320k</text>
+      </view>
+    </block>
+
+    <!-- 无损格式提示 (WAV / FLAC) -->
+    <view wx:else class="lossless-notice-box">
+      <view class="lossless-notice-content">
+        <text class="lossless-icon">💡</text>
+        <view class="lossless-texts">
+          <text class="lossless-title">当前为 {{targetFormat == 'wav' ? 'WAV' : 'FLAC'}} 无损母带格式</text>
+          <text class="lossless-desc">无损保留全量音频采样，文件体积较大。若需要大幅压缩体积，建议转换为 MP3 或 AAC 格式。</text>
+        </view>
+      </view>
+      <button class="switch-mp3-btn" bindtap="switchToMp3Compress">
+        <text class="switch-txt">一键切为 MP3 压缩 ➔</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- 6. 高级调音折叠面板 (Accordion) -->
+  <view class="card-panel">
+    <view class="advanced-toggle-bar" bindtap="toggleAdvanced">
+      <view class="advanced-title-left">
+        <text class="panel-title">高级音频参数 (可选)</text>
+        <text class="advanced-summary-chip">{{options.bitrate}} · {{options.sampleRate ? options.sampleRate + 'Hz' : '原采样率'}}</text>
+      </view>
+      <view class="advanced-arrow {{showAdvanced ? 'up' : 'down'}}">
+        <text>{{showAdvanced ? '▲' : '▼'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{showAdvanced}}" class="advanced-drawer-body">
+      <!-- 比特率 -->
+      <view class="param-group">
+        <text class="param-title">输出比特率 (音质与体积平衡)</text>
+        <view class="segment-chips-row">
+          <view 
+            wx:for="{{bitrateOptions}}" 
+            wx:key="value" 
+            class="segment-chip {{options.bitrate === item.value ? 'active' : ''}}"
+            bindtap="setBitrate"
+            data-val="{{item.value}}"
+          >
+            <text class="chip-main-text">{{item.label}}</text>
+            <text class="chip-sub-text">{{item.sub}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 采样率 -->
+      <view class="param-group">
+        <text class="param-title">采样频率 (Sample Rate)</text>
+        <view class="segment-chips-row">
+          <view 
+            wx:for="{{sampleRateOptions}}" 
+            wx:key="value" 
+            class="segment-chip {{options.sampleRate === item.value ? 'active' : ''}}"
+            bindtap="setSampleRate"
+            data-val="{{item.value}}"
+          >
+            <text class="chip-main-text">{{item.label}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 声道 -->
+      <view class="param-group">
+        <text class="param-title">音频声道</text>
+        <view class="segment-chips-row">
+          <view 
+            class="segment-chip {{options.channels === 2 ? 'active' : ''}}"
+            bindtap="setChannels"
+            data-val="{{2}}"
+          >
+            <text class="chip-main-text">立体声 (双声道)</text>
+          </view>
+          <view 
+            class="segment-chip {{options.channels === 1 ? 'active' : ''}}"
+            bindtap="setChannels"
+            data-val="{{1}}"
+          >
+            <text class="chip-main-text">单声道</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 6. 转换执行与结果看板 -->
+  <view class="action-dock-panel">
+    
+    <!-- 立即开始转换按键 (高对比度 Apple / Claude 风格大按键) -->
+    <button 
+      wx:if="{{status === 'IDLE'}}" 
+      class="primary-convert-button {{!sourceFile ? 'disabled' : ''}}" 
+      bindtap="startConvert"
+    >
+      <text class="btn-icon-symbol">⚡</text>
+      <text class="btn-text">{{sourceFile && isCompressibleFormat && savedRatioText > 0 ? '开始压缩转换 (预计瘦身 ' + savedRatioText + '%)' : '立即开始转换'}}</text>
+    </button>
+
+    <!-- 转码进度展示卡片 -->
+    <view wx:if="{{status === 'UPLOADING' || status === 'TRANSCODING'}}" class="card-panel converting-progress-card">
+      <view class="converting-header">
+        <view class="modern-spinner"></view>
+        <view class="converting-texts">
+          <text class="converting-main-text">{{statusText}}</text>
+          <text class="converting-sub-text">FFmpeg 云端多核渲染处理中，请稍候...</text>
+        </view>
+      </view>
+
+      <!-- 3步极简进度条 -->
+      <view class="step-progress-row">
+        <view class="step-col {{status === 'UPLOADING' ? 'active' : 'completed'}}">
+          <view class="step-circle">1</view>
+          <text class="step-label">上传音频</text>
+        </view>
+        <view class="step-track-line {{status === 'TRANSCODING' ? 'active-line' : ''}}"></view>
+        <view class="step-col {{status === 'TRANSCODING' ? 'active' : ''}}">
+          <view class="step-circle">2</view>
+          <text class="step-label">云端转码</text>
+        </view>
+        <view class="step-track-line"></view>
+        <view class="step-col">
+          <view class="step-circle">3</view>
+          <text class="step-label">生成结果</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 转换成功结果卡片 (Fresh Master Victory Card) -->
+    <view wx:if="{{status === 'SUCCESS' && convertResult}}" class="card-panel result-success-card">
+      
+      <view class="result-top-badge">
+        <view class="result-title-group">
+          <text class="success-icon">✓</text>
+          <text class="success-title">转码成功！</text>
+        </view>
+        <text class="cost-tag">耗时 {{convertResult.costSeconds}} 秒</text>
+      </view>
+
+      <!-- 文件体积对比看板 (Before & After Contrast) -->
+      <view class="size-comparison-board">
+        <view class="comp-item">
+          <text class="comp-label">原文件大小</text>
+          <text class="comp-number">{{sourceFile.sizeText}}</text>
+          <text class="comp-format-tag">{{sourceFile.extName}}</text>
+        </view>
+
+        <view class="comp-center-divider">
+          <text class="comp-arrow-symbol">➔</text>
+          <text wx:if="{{convertResult.savedRatio > 0}}" class="comp-saved-badge">瘦身 {{convertResult.savedRatio}}%</text>
+        </view>
+
+        <view class="comp-item highlight">
+          <text class="comp-label">转换后大小</text>
+          <text class="comp-number">{{convertResult.targetSizeText}}</text>
+          <text class="comp-format-tag accent">{{convertResult.targetFormat.toUpperCase()}}</text>
+        </view>
+      </view>
+
+      <!-- 新音频即时试听播放器 -->
+      <view class="result-audition-box">
+        <view class="audition-header-row">
+          <view class="audition-title-wrap">
+            <text class="audition-title">🎧 转换完成 · 新音频原声试听</text>
+            <view wx:if="{{isTargetPlaying}}" class="audition-playing-badge">
+              <text class="wave-dot-anim"></text>
+              <text class="playing-txt">正在试听中</text>
+            </view>
+          </view>
+          <text wx:if="{{filePreparing}}" class="prep-indicator">本地缓存中...</text>
+          <text wx:elif="{{resultTempFilePath}}" class="prep-indicator ready">本地就绪 · 零缓冲</text>
+        </view>
+
+        <!-- 支持前端原生试听的格式 -->
+        <block wx:if="{{targetPlayable}}">
+          <view class="inline-player result-inline-player">
+            <view class="player-play-btn result-play-btn {{isTargetPlaying ? 'playing' : ''}}" bindtap="togglePlayTarget">
+              <text class="play-btn-icon">{{isTargetPlaying ? '⏸' : '▶'}}</text>
+            </view>
+            
+            <view class="player-progress-area">
+              <slider 
+                class="custom-slider" 
+                min="0" 
+                max="{{targetDuration || 100}}" 
+                value="{{targetCurrentTime}}" 
+                bindchange="onTargetSeek"
+                block-size="16"
+                activeColor="#16A34A"
+                backgroundColor="#E7E5E4"
+              />
+              <view class="player-time-display">
+                <text class="time-item">{{targetCurrentTimeText}}</text>
+                <text class="time-item">{{targetDurationText}}</text>
+              </view>
+            </view>
+          </view>
+        </block>
+
+        <!-- 针对专用无损或不支持页面原生解码的格式给出智能指引 -->
+        <view wx:else class="unplayable-result-banner" bindtap="togglePlayTarget">
+          <text class="unplayable-result-icon">💡</text>
+          <view class="unplayable-result-texts">
+            <text class="unplayable-result-title">{{convertResult.targetFormat.toUpperCase()}} 为母带专用编码</text>
+            <text class="unplayable-result-desc">受手机系统原生播放器限制无法在页面直接试听。音频已按无损高保真完整生成，点击下方「发给微信好友」或「保存」，在微信聊天中可直接原声试听与永久保存！</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 操作导出按钮组 -->
+      <view class="result-action-buttons">
+        <button class="export-btn primary-share" bindtap="shareToFriend">
+          <text class="btn-icon-emoji">🚀</text>
+          <text>发给微信好友</text>
+        </button>
+        <button class="export-btn secondary-save" bindtap="saveToLocal">
+          <text class="btn-icon-emoji">💾</text>
+          <text>保存 / 转发文件</text>
+        </button>
+      </view>
+
+      <!-- 辅助链接 -->
+      <view class="aux-links-row">
+        <view class="aux-link-item" bindtap="copyDownloadLink">
+          <text class="aux-link-icon">🔗</text>
+          <text>复制外链 (电脑浏览器下载)</text>
+        </view>
+        <view class="aux-link-item reset-btn" bindtap="resetAll">
+          <text class="aux-link-icon">🔄</text>
+          <text>再转一首</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 7. 优雅轻量页脚信息 (Clean Editorial Footer) -->
+  <view class="editorial-footer">
+    <view class="footer-privacy-box">
+      <text class="footer-privacy-text">🔒 隐私承诺：所有临时音频文件仅用于本次转码，24小时后全自动物理销毁</text>
+      <text class="footer-hint-text">💡 提示：转发至微信「文件传输助手」，可直接在聊天中长按保存至手机系统</text>
+    </view>
+    <view wx:if="{{quotaUsed !== null}}" class="footer-quota-pill">
+      <text>今日免费额度：{{quotaUsed}} / 5 次</text>
+    </view>
+    <text class="footer-copyright">AudioConvert · 极简 · 纯净 · 高保真</text>
+  </view>
+
+  <!-- 历史记录手作抽屉面板 (History Bottom Sheet) -->
+  <view wx:if="{{showHistoryModal}}" class="modal-backdrop" bindtap="closeHistoryModal">
+    <view class="modal-sheet-panel" catchtap="preventBubble">
+      <view class="sheet-drag-handle"></view>
+      
+      <view class="sheet-header">
+        <view class="sheet-title-group">
+          <text class="sheet-title">转换历史记录 ({{historyList.length}})</text>
+          <text class="sheet-sub">云端文件保留 24 小时，过期后请重新转换</text>
+        </view>
+        <view class="sheet-close-btn" bindtap="closeHistoryModal">✕</view>
+      </view>
+
+      <view wx:if="{{historyList.length === 0}}" class="sheet-empty-state">
+        <text class="empty-icon-emoji">📭</text>
+        <text class="empty-title">暂无转换历史</text>
+      </view>
+
+      <scroll-view wx:else scroll-y class="history-scroll-viewport">
+        <view wx:for="{{historyList}}" wx:key="id" class="history-row-card">
+          <view class="history-meta-info">
+            <text class="history-name-text">{{item.fileName}}</text>
+            <view class="history-tags-flow">
+              <text class="history-badge-format">{{item.sourceExt}} ➔ {{item.targetFormat}}</text>
+              <text class="history-badge-time">{{item.time}}</text>
+              <text class="history-badge-size">{{item.targetSizeText}}</text>
+            </view>
+          </view>
+          <view class="history-share-action-btn" bindtap="shareHistoryItem" data-item="{{item}}">
+            <text>分享</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{historyList.length > 0}}" class="sheet-footer-actions">
+        <view class="sheet-clear-btn" bindtap="clearHistory">清空历史记录</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 隐私保护授权卡片 (Privacy Modal) -->
+  <view wx:if="{{showPrivacy}}" class="modal-backdrop" catchtap="preventBubble">
+    <view class="privacy-dialog-card">
+      <view class="privacy-dialog-icon">🔐</view>
+      <text class="privacy-dialog-title">用户隐私保护提示</text>
+      <text class="privacy-dialog-content">
+        使用本音频转换服务前，请阅读并同意《隐私政策》。我们仅在你自主选择音频后上传处理，文件仅用于本次转码，并在 24 小时内彻底物理销毁；绝不用于任何其他商业用途。
+      </text>
+      <view class="privacy-dialog-link" bindtap="openPrivacyContract">查看《隐私政策》</view>
+      <view class="privacy-dialog-actions">
+        <button class="dialog-btn disagree" id="disagree-btn" bindtap="handleDisagreePrivacy">不同意</button>
+        <button class="dialog-btn agree" id="agree-btn" bindtap="handleAgreePrivacy">同意并继续</button>
+      </view>
+    </view>
+  </view>
+
+</view>

@@ -1,0 +1,37 @@
+/** app.wxss **/
+page {
+  background-color: #F8F6F2;
+  color: #1C1917;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "PingFang SC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Design Tokens */
+:root {
+  --color-canvas: #F8F6F2;
+  --color-card: #FFFFFF;
+  --color-primary-text: #1C1917;
+  --color-secondary-text: #78716C;
+  --color-accent: #FF6B00;
+  --color-accent-soft: #FFF7ED;
+  --color-success: #16A34A;
+  --color-border: rgba(0, 0, 0, 0.06);
+}
+
+button {
+  background: initial;
+  padding: 0;
+  margin: 0;
+  border: none;
+  font-family: inherit;
+  line-height: inherit;
+}
+
+button:focus {
+  outline: 0;
+}
+
+button::after {
+  border: none;
+}

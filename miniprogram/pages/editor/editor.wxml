@@ -1,0 +1,1452 @@
+<!-- miniprogram/pages/editor/editor.wxml -->
+<view class="app-container {{status === 'editing' ? 'with-export-bar' : ''}}">
+
+  <!-- 1. 顶部品牌区 (去重版：去除多余的重复标题，轻盈高级) -->
+  <view class="header-nav">
+    <view class="brand-block">
+      <view class="brand-tag">
+        <text class="brand-dot"></text>
+        <text class="brand-tag-text">AUDIO SPLICER & TRIMMER</text>
+      </view>
+      <text class="brand-title">音频多轨剪辑</text>
+      <text class="brand-desc">多段拼接 · 波形裁剪 · 独立淡入淡出 · 动态调音</text>
+    </view>
+  </view>
+
+  <!-- ================= 1. 空态 (Empty State) ================= -->
+  <block wx:if="{{status === 'empty'}}">
+    
+    <!-- 导入失败提示 -->
+    <view wx:if="{{loadError}}" class="card-panel error-card">
+      <view class="error-top-row">
+        <text class="error-icon">⚠️</text>
+        <text class="error-title">处理遇到问题</text>
+      </view>
+      <text class="error-text">{{loadError}}</text>
+      <text wx:if="{{importFailureNames}}" class="error-file-names">失败文件：{{importFailureNames}}</text>
+      <view class="error-actions-row">
+        <button class="pill-btn ghost" bindtap="chooseAudioFiles">重新选择</button>
+        <button class="pill-btn primary" bindtap="retryFailedImports">重试导入</button>
+      </view>
+    </view>
+
+    <!-- 核心选文件卡片 (彻底优化添加文字与折行排版) -->
+    <view class="card-panel empty-dropzone-panel">
+      <view class="upload-disc-icon">
+        <view class="disc-groove">
+          <view class="disc-hole"></view>
+        </view>
+        <view class="disc-sparkle">✂️</view>
+      </view>
+
+      <text class="upload-main-title">导入音频开启剪辑</text>
+      <text class="upload-sub-title">支持从微信聊天、单聊、群聊或文件传输助手选取音频</text>
+
+      <!-- 单行不换行的高质感药丸按键 -->
+      <view class="action-btn-wrapper">
+        <button class="primary-action-pill" bindtap="chooseAudioFiles">
+          <text class="action-pill-plus">+</text>
+          <text class="action-pill-text">从微信选择音频</text>
+        </button>
+      </view>
+
+      <!-- 规格说明气泡标签 -->
+      <view class="spec-capsule-tag">
+        <text>最多支持 5 个音频 · 单文件 ≤ 50MB · 成片 ≤ 10 分钟</text>
+      </view>
+
+      <!-- 支持的格式标签 -->
+      <view class="support-format-tags">
+        <text class="format-mini-tag">MP3</text>
+        <text class="format-mini-tag">WAV</text>
+        <text class="format-mini-tag">FLAC</text>
+        <text class="format-mini-tag">M4A</text>
+        <text class="format-mini-tag">AAC</text>
+        <text class="format-mini-tag">OGG</text>
+        <text class="format-mini-tag">AMR</text>
+        <text class="format-mini-tag">APE</text>
+        <text class="format-mini-tag">WMA</text>
+      </view>
+    </view>
+
+    <!-- 剪辑快速指南 -->
+    <view class="card-panel guide-card">
+      <view class="panel-header">
+        <text class="panel-title">剪辑核心能力</text>
+        <text class="panel-tip">本地解析 · 云端精剪</text>
+      </view>
+      
+      <view class="guide-steps-list">
+        <view class="guide-step-row">
+          <view class="step-num-bubble">1</view>
+          <view class="step-desc">
+            <text class="step-heading">多源音轨拼接</text>
+            <text class="step-detail">选取 1~5 个音频文件，系统自动解析音轨并按时间序拼接</text>
+          </view>
+        </view>
+
+        <view class="guide-step-row">
+          <view class="step-num-bubble">2</view>
+          <view class="step-desc">
+            <text class="step-heading">波形标尺选区与分割</text>
+            <text class="step-detail">带精准时间标尺，支持指针一键剪开，或拖动左右把手圈选裁剪</text>
+          </view>
+        </view>
+
+        <view class="guide-step-row">
+          <view class="step-num-bubble">3</view>
+          <view class="step-desc">
+            <text class="step-heading">独立淡变与动态增益</text>
+            <text class="step-detail">为各个分段单独配置淡入/淡出，调节全局音量并导出高保真 MP3</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="guide-footer-tip">
+        <text class="tip-icon">💡</text>
+        <text>iPhone 暂不支持 FLAC/OGG 直接播放时，可正常剪辑并直接导出 MP3 试听。</text>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- ================= 2. 上传 / 分析中状态 ================= -->
+  <block wx:if="{{status === 'uploading' || status === 'analyzing'}}">
+    <view class="card-panel progress-card">
+      <view class="progress-top">
+        <view class="modern-spinner"></view>
+        <view class="progress-texts">
+          <text class="progress-title-text">{{stageText}}</text>
+          <text class="progress-file-text">{{importFileName}}</text>
+        </view>
+      </view>
+
+      <view class="progress-desc-box">
+        <text class="progress-step-text">{{importProgressText}}</text>
+        <text class="progress-hint">多文件将逐个上传和解析波形，请保持在当前页面</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- ================= 3. 编辑态 (Editing Studio) ================= -->
+  <block wx:if="{{status === 'editing'}}">
+
+    <!-- 导入失败提醒 -->
+    <view wx:if="{{importFailures.length}}" class="card-panel warn-card">
+      <view class="warn-title">⚠️ {{importFailures.length}} 个文件导入未成功</view>
+      <text class="warn-names">{{importFailureNames}}</text>
+      <text class="warn-detail">{{importFailureDetail}}</text>
+      <view class="warn-actions">
+        <button class="pill-btn ghost small" bindtap="dismissImportFailures">忽略</button>
+        <button class="pill-btn primary small" bindtap="retryFailedImports">重试失败项</button>
+      </view>
+    </view>
+
+    <!-- 试听受限横幅 -->
+    <view wx:if="{{previewBanner}}" class="banner-notice">
+      <text class="banner-icon">💡</text>
+      <text>{{previewBanner}}</text>
+    </view>
+
+    <!-- 核心工作区一：波形精修工作台 (Waveform Precision Studio) -->
+    <view class="card-panel waveform-editor-card">
+      <view class="waveform-header">
+        <view class="time-readout">
+          <text class="time-main">{{currentTimeText}}</text>
+          <text class="time-total"> / {{totalDurationText}}</text>
+        </view>
+        <view class="clip-locator-badge">
+          <text>{{selectedClip.trackId || 'A1'}} 轨 · 第 {{selectedClipIndex + 1}}/{{clipCount}} 段 · {{selectedClip.durationText}}</text>
+        </view>
+      </view>
+
+      <!-- 交互式 Canvas 波形图 (带秒数时间刻度标尺与高触感抓手) -->
+      <view class="canvas-wrapper">
+        <canvas
+          type="2d"
+          id="waveCanvas"
+          class="wave-canvas"
+          disable-scroll
+          bindtouchstart="onWaveTouchStart"
+          bindtouchmove="onWaveTouchMove"
+          bindtouchend="onWaveTouchEnd"
+          bindtouchcancel="onWaveTouchCancel"
+        ></canvas>
+      </view>
+      <view wx:if="{{waveUnavailable}}" class="canvas-fallback-tip">当前系统不支持渲染波形，可通过按钮精细微调</view>
+
+      <!-- 选区提示行 -->
+      <view class="selection-status-row">
+        <view wx:if="{{activeTool === 'razor'}}" class="selection-razor-hint">
+          <view class="razor-pulse-dot"></view>
+          <text class="razor-hint-text">✂️ 剃刀就绪：轻触波形或音轨切断</text>
+          <view class="razor-exit-chip" bindtap="setToolSelect">退出 ✕</view>
+        </view>
+        <view wx:elif="{{hasSelection}}" class="selection-active-chip">
+          <text>选区：{{selection.startText}} ~ {{selection.endText}} (时长 {{selection.durText}})</text>
+        </view>
+        <view wx:else class="selection-idle-hint">
+          <text>👉 拖动波形创建选区；轻按空白处移动播放指针；拖动左右把手微调</text>
+        </view>
+      </view>
+
+      <!-- ================= 专业精修控制中枢 (Unified Studio Command Console) ================= -->
+      <view class="studio-command-console">
+
+        <!-- 第 1 栏：模式选择分段器 (iOS Segmented Control) + 右侧辅助功能胶囊组 (严格水平对齐，彻底消除拥挤小方块) -->
+        <view class="console-mode-utility-row">
+          <!-- 模式切换分段器：选择模式 vs 剃刀切割 (大触控区、高对比度、无折行拥挤) -->
+          <view class="mode-segmented-pill">
+            <view class="mode-segment-item {{activeTool === 'select' ? 'active-select' : ''}}" bindtap="setToolSelect">
+              <image class="segment-mono-icon" src="{{activeTool === 'select' ? monoIcons.cursorWhite : monoIcons.cursor}}"></image>
+              <text class="segment-text">选择</text>
+            </view>
+            <view class="mode-segment-item {{activeTool === 'razor' ? 'active-razor' : ''}}" bindtap="setToolRazor">
+              <image class="segment-mono-icon" src="{{activeTool === 'razor' ? monoIcons.scissorsWhite : monoIcons.scissors}}"></image>
+              <text class="segment-text">剃刀</text>
+              <view wx:if="{{activeTool === 'razor'}}" class="razor-active-dot"></view>
+            </view>
+          </view>
+
+          <!-- 辅助功能胶囊组：磁吸、归零、撤销 (同高度、统一圆角、严谨等距对齐) -->
+          <view class="utility-pill-group">
+            <view class="utility-pill-btn {{snapEnabled ? 'active-snap' : ''}}" bindtap="toggleSnap" title="磁吸对齐">
+              <image class="utility-mono-icon" src="{{snapEnabled ? monoIcons.magnetActive : monoIcons.magnet}}"></image>
+              <text class="utility-text">磁吸</text>
+            </view>
+            <view class="utility-pill-btn" bindtap="seekToZero" title="光标归零">
+              <image class="utility-mono-icon" src="{{monoIcons.zero}}"></image>
+              <text class="utility-text">归零</text>
+            </view>
+            <view class="utility-pill-btn {{canUndo ? '' : 'disabled'}}" bindtap="undo" title="撤销操作">
+              <image class="utility-mono-icon" src="{{monoIcons.undo}}"></image>
+              <text class="utility-text">撤销</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 第 2 栏：剪辑操作等宽对齐网格 (4 等分网格，统一 74rpx 高度，严密对称) -->
+        <view class="console-action-grid">
+          <button class="grid-action-btn primary-cut" bindtap="splitSelectedClipAtPlayhead">
+            <image class="action-mono-icon" src="{{monoIcons.splitWhite}}"></image>
+            <text class="action-label">指针分割</text>
+          </button>
+          <button class="grid-action-btn {{hasSelection ? 'active-crop' : 'disabled'}}" bindtap="cropSelectedClipToSelection">
+            <image class="action-mono-icon" src="{{monoIcons.crop}}"></image>
+            <text class="action-label">裁至选区</text>
+          </button>
+          <button class="grid-action-btn danger {{hasSelection ? '' : 'disabled'}}" bindtap="rippleDeleteSelection">
+            <image class="action-mono-icon" src="{{monoIcons.trash}}"></image>
+            <text class="action-label">删除选区</text>
+          </button>
+          <button class="grid-action-btn neutral" bindtap="selectAll">
+            <image class="action-mono-icon" src="{{monoIcons.selectAll}}"></image>
+            <text class="action-label">全选本段</text>
+          </button>
+        </view>
+
+        <!-- 第 3 栏：主控播放对称行 (双核大胶囊，统一 88rpx 高度，完全对称) -->
+        <view class="console-transport-row">
+          <button class="transport-hero-btn primary-all {{isPlaying && playMode === 'all' ? 'playing' : ''}}" bindtap="togglePlayAll">
+            <image class="transport-hero-icon" src="{{isPlaying && playMode === 'all' ? monoIcons.pauseWhite : monoIcons.playWhite}}"></image>
+            <text class="transport-hero-text">{{isPlaying && playMode === 'all' ? '暂停整片' : '播放全部'}}</text>
+          </button>
+          <button class="transport-hero-btn secondary-clip {{canPreviewClip ? '' : 'disabled'}} {{isPlaying && playMode === 'clip' ? 'playing' : ''}}" bindtap="togglePlayClip">
+            <image class="transport-hero-icon" src="{{isPlaying && playMode === 'clip' ? monoIcons.pause : monoIcons.headphone}}"></image>
+            <text class="transport-hero-text">{{isPlaying && playMode === 'clip' ? '暂停本段' : '试听本段'}}</text>
+          </button>
+        </view>
+
+        <!-- 第 4 栏：微提示文案 (居中微字号，与整体卡片边缘视觉对齐) -->
+        <text class="console-clarify-hint">提示：播放预览为快速模拟效果；导出时将由云端执行高保真多轨混音渲染。</text>
+
+      </view>
+    </view>
+
+    <!-- 核心工作区二：多轨时间线与音频拼接工坊 (Multi-Track Splicing Studio) -->
+    <view class="card-panel nle-timeline-card">
+      
+      <!-- 1. 顶部控制栏：音轨信息、缩放步进器、添加音轨按键 (优化双行高触感布局) -->
+      <view class="timeline-top-toolbar">
+        <view class="toolbar-primary-row">
+          <view class="timeline-title-meta">
+            <text class="timeline-main-title">多轨剪辑时间轴</text>
+            <text class="timeline-sub-meta">共 {{tracks.length}} 条音轨 · {{clipCount}} 个片段 · 成片 {{planDurationText}}</text>
+          </view>
+
+          <!-- 新建音轨主按键 (单色加号图标 + 清晰文字) -->
+          <view class="add-track-pill-btn" bindtap="addTrack">
+            <image class="mono-add-track-icon" src="{{monoIcons.plus}}"></image>
+            <text>添加音轨</text>
+          </view>
+        </view>
+
+        <!-- 缩放控制行：左侧预设药丸 + 右侧百分比步进器 (彻底消除全览重叠挤占) -->
+        <view class="toolbar-secondary-row">
+          <view class="zoom-preset-tags">
+            <view class="preset-tag {{zoomPercentText === '全览' || zoomLevel <= 0.08 ? 'active' : ''}}" bindtap="zoomFit">全览</view>
+            <view class="preset-tag {{zoomLevel === 1.0 ? 'active' : ''}}" data-scale="1.0" bindtap="setZoomScale">1x 标准</view>
+            <view class="preset-tag {{zoomLevel === 2.0 ? 'active' : ''}}" data-scale="2.0" bindtap="setZoomScale">2x 精细</view>
+          </view>
+
+          <view class="zoom-stepper">
+            <button class="zoom-step-btn" bindtap="zoomOut">－</button>
+            <view class="zoom-level-pill" bindtap="cycleZoom">
+              <text class="zoom-ratio-text">{{zoomLevelRatioText || zoomPercentText}}</text>
+            </view>
+            <button class="zoom-step-btn" bindtap="zoomIn" disabled="{{zoomLevel >= 4.0}}">＋</button>
+          </view>
+        </view>
+      </view>
+
+      <!-- 剃刀快捷操作条 (Floating Razor Cut HUD) -->
+      <view wx:if="{{activeTool === 'razor'}}" class="razor-mode-hud-bar">
+        <view class="razor-hud-left">
+          <image class="razor-hud-mono-icon" src="{{monoIcons.scissorsWhite}}"></image>
+          <view class="razor-hud-texts">
+            <text class="razor-hud-title">✂️ 剃刀模式已开启</text>
+            <text class="razor-hud-desc">触碰波形或任意片段即刻切断</text>
+          </view>
+        </view>
+        <view class="razor-hud-actions">
+          <button class="razor-hud-split-btn" bindtap="splitSelectedClipAtPlayhead">
+            <image class="razor-hud-btn-icon" src="{{monoIcons.splitWhite}}"></image>
+            <text>剪断红针处</text>
+          </button>
+          <button class="razor-hud-exit-btn" bindtap="setToolSelect">退出 ✕</button>
+        </view>
+      </view>
+
+      <!-- 2. 统一步进时间轴机架 (Sticky Headers + Synchronous Timeline) -->
+      <view class="nle-studio-assembly">
+        <!-- 左侧固定轨道头 (Sticky Track Headers) -->
+        <view class="nle-sticky-headers-col">
+          <!-- 标尺角标对齐占位 -->
+          <view class="nle-ruler-corner">
+            <text class="corner-label">音轨</text>
+          </view>
+
+          <!-- 各固定音轨控制头 (Track Header Cells) -->
+          <view
+            wx:for="{{timelineData.tracks}}"
+            wx:for-item="track"
+            wx:key="id"
+            class="nle-header-cell {{track.mute ? 'muted' : ''}}"
+            style="border-left: 6rpx solid {{track.color}};"
+          >
+            <view class="track-header-top">
+              <view class="track-title-badge">
+                <text class="track-color-dot" style="background-color: {{track.color}};"></text>
+                <text class="track-name-text">{{track.name}}</text>
+              </view>
+              <view wx:if="{{timelineData.tracks.length > 1}}" class="track-del-icon" data-track="{{track.id}}" bindtap="deleteTrack">✕</view>
+            </view>
+
+            <view class="track-header-mid">
+              <view class="track-ctrl-tag {{track.mute ? 'active-mute' : ''}}" data-track="{{track.id}}" bindtap="toggleTrackMute">
+                <text>{{track.mute ? '已静' : '静音'}}</text>
+              </view>
+              <view class="track-ctrl-tag {{track.ducking ? 'active-duck' : ''}}" data-track="{{track.id}}" bindtap="toggleTrackDucking" title="遇人声自动下压-12dB">
+                <text>{{track.ducking ? '🦆避让中' : '🦆避让'}}</text>
+              </view>
+            </view>
+
+            <view class="track-header-bottom">
+              <view class="track-vol-chip" data-track="{{track.id}}" bindtap="cycleTrackVolume" title="点击轮换音量预设">
+                <text>{{track.volumeDb ? (track.volumeDb > 0 ? '+' + track.volumeDb : track.volumeDb) + 'dB' : '0dB'}}</text>
+              </view>
+              <view class="track-add-audio-chip" data-track="{{track.id}}" bindtap="addAudioToTrack">
+                <text>+ 加音频</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 右侧全轨统一步进水平时间轴 (Single Synchronous Horizontal Scroll-View) -->
+        <scroll-view
+          scroll-x="{{!isDraggingClip && !isTrimmingClip}}"
+          class="nle-timeline-scroll"
+          scroll-left="{{timelineScrollLeft}}"
+          bindscroll="onTimelineScroll"
+          bindtouchstart="onTimelineTouchStart"
+          bindtouchmove="onTimelineTouchMove"
+          bindtouchend="onTimelineTouchEnd"
+          bindtouchcancel="onTimelineTouchEnd"
+        >
+          <view class="nle-timeline-surface {{isPinchingTimeline ? 'pinching' : ''}} {{isZoomAnimating ? 'animating-zoom' : ''}}" style="width: {{timelineData.timelineWidthRpx}}rpx;" bindtap="onTimelineTap">
+            
+            <!-- 实时双指手势缩放指示吸顶药丸 (Active Pinch to Zoom Floating Pill) -->
+            <view wx:if="{{isPinchingTimeline}}" class="timeline-drag-floating-pill pinch-pill">
+              <text class="drag-pill-icon">🔍</text>
+              <text class="drag-pill-text">{{pinchTipText}}</text>
+            </view>
+
+            <!-- 播放中手动滑阅后续内容时的回随光标悬浮药丸 (Back to Playhead Pill) -->
+            <view wx:if="{{!isPinchingTimeline && isPlaying && userBrowsingWhilePlaying}}" class="timeline-drag-floating-pill resume-follow-pill" catchtap="resumePlayheadFollow">
+              <text class="drag-pill-icon">📍</text>
+              <text class="drag-pill-text">正在查看后续 · 点击回至指针 ↩</text>
+            </view>
+
+            <!-- 实时拖拽/拖动裁剪指示吸顶药丸 (Active Dragging / Trimming Floating Pill) -->
+            <view wx:if="{{!isPinchingTimeline && !userBrowsingWhilePlaying && (isDraggingClip || isTrimmingClip)}}" class="timeline-drag-floating-pill">
+              <text class="drag-pill-icon">📍</text>
+              <text class="drag-pill-text">{{isTrimmingClip ? trimTipText : dragTipText}}</text>
+            </view>
+
+            <!-- 统一顶部时间标尺 (Time Ruler) -->
+            <view class="nle-unified-ruler">
+              <view
+                wx:for="{{timelineData.rulerTicks}}"
+                wx:key="sec"
+                class="ruler-tick-mark"
+                style="left: {{item.leftRpx}}rpx;"
+                data-time="{{item.sec}}"
+                bindtap="onRulerTickTap"
+              >
+                <view class="tick-line"></view>
+                <text class="tick-label">{{item.text}}</text>
+              </view>
+
+              <!-- 10 分钟云端导出限额标线与界碑 -->
+              <view wx:if="{{timelineData.ceilingRpx}}" class="ruler-ceiling-marker" style="left: {{timelineData.ceilingRpx}}rpx;">
+                <view class="ceiling-pill">
+                  <text class="ceiling-pill-icon">⏱️</text>
+                  <text class="ceiling-pill-text">10:00 导出限额</text>
+                </view>
+                <view class="ceiling-ruler-tick"></view>
+              </view>
+            </view>
+
+            <!-- 轨道泳道列表 (Tracks Canvas) -->
+            <view class="nle-tracks-canvas">
+              <!-- 10 分钟导出限额垂直贯穿线 -->
+              <view wx:if="{{timelineData.ceilingRpx}}" class="tracks-ceiling-divider" style="left: {{timelineData.ceilingRpx}}rpx;">
+                <view class="ceiling-vertical-line"></view>
+              </view>
+              <!-- 超出限额警戒区域遮罩 -->
+              <view wx:if="{{timelineData.isExceededCeiling}}" class="tracks-over-ceiling-zone" style="left: {{timelineData.ceilingRpx}}rpx;"></view>
+
+              <view
+                wx:for="{{timelineData.tracks}}"
+                wx:for-item="track"
+                wx:key="id"
+                class="nle-track-lane {{track.mute ? 'muted' : ''}}"
+              >
+                <!-- 轨道网格基准线 -->
+                <view class="lane-grid-bg"></view>
+
+                <!-- 若此轨暂无音频：大面积通栏点击添加引导卡片 (Dropzone) -->
+                <view
+                  wx:if="{{track.clips.length === 0}}"
+                  class="empty-track-dropzone"
+                  data-track="{{track.id}}"
+                  bindtap="addAudioToTrack"
+                >
+                  <text class="dropzone-plus">+</text>
+                  <text class="dropzone-text">点击向「{{track.name}}」添加音频</text>
+                </view>
+
+                <!-- 片段容器：绝对定位摆放 -->
+                <view wx:else class="lane-clips-layer">
+                  <view
+                    wx:for="{{track.clips}}"
+                    wx:for-item="clip"
+                    wx:key="id"
+                    class="nle-clip-card {{clip.isSelected ? 'selected' : ''}} {{clip.isOverlapping ? 'is-overlapping' : ''}} {{isDraggingClip && clip.index === dragClipIndex ? 'dragging' : ''}} {{isTrimmingClip && clip.isSelected ? 'trimming' : ''}} {{activeTool === 'razor' ? 'razor-armed' : ''}} {{justSplitIndex === clip.index ? 'just-split' : ''}}"
+                    style="left: {{isDraggingClip && clip.index === dragClipIndex ? dragClipLeftRpx : (isTrimmingClip && clip.isSelected && trimLeftRpx !== undefined ? trimLeftRpx : clip.leftRpx)}}rpx; width: {{isTrimmingClip && clip.isSelected && trimWidthRpx !== undefined ? trimWidthRpx : clip.widthRpx}}rpx; border-color: {{clip.isSelected ? '#FF6B00' : (clip.isOverlapping ? '#F59E0B' : track.color)}};"
+                    data-index="{{clip.index}}"
+                    catchtap="onTrackClipTap"
+                    catchtouchstart="onClipTouchStart"
+                    catchtouchmove="onClipTouchMove"
+                    catchtouchend="onClipTouchEnd"
+                  >
+                    <!-- 片段重叠碰撞警戒角标 -->
+                    <view wx:if="{{clip.isOverlapping}}" class="clip-overlap-badge">
+                      <text class="badge-icon">⚠️</text>
+                      <text class="badge-text">{{clip.overlapText || '重叠'}}</text>
+                    </view>
+
+                    <!-- 选中修剪把手 (Trim In Handle) - 直接拖动完成裁剪 -->
+                    <view
+                      wx:if="{{clip.isSelected}}"
+                      class="trim-handle trim-in {{isTrimmingClip && trimType === 'in' ? 'active' : ''}}"
+                      catchtouchstart="onTrimInTouchStart"
+                      catchtouchmove="onTrimInTouchMove"
+                      catchtouchend="onTrimInTouchEnd"
+                      catchtouchcancel="onTrimInTouchEnd"
+                    >
+                      <view class="trim-grip-bars">
+                        <text class="trim-bar"></text>
+                        <text class="trim-bar"></text>
+                      </view>
+                    </view>
+
+                    <!-- 片段内容主体 -->
+                    <view class="clip-card-body">
+                      <!-- 剃刀武装悬浮徽章 -->
+                      <view wx:if="{{activeTool === 'razor'}}" class="clip-razor-scissor-tag">
+                        <image class="clip-scissor-mini-icon" src="{{monoIcons.scissorsWhite}}"></image>
+                        <text>点触切断</text>
+                      </view>
+
+                      <!-- 重复分段专属标记：只做 🎵 标记，不展现文字 -->
+                      <view wx:if="{{clip.isDuplicate}}" class="clip-mark-only-tag">
+                        <text class="clip-mark-icon">🎵</text>
+                      </view>
+
+                      <!-- 首次出现的原始片段：常规展现名称与时长文字 -->
+                      <view wx:else class="clip-top-line">
+                        <text class="clip-name-text">{{clip.sourceName}}</text>
+                        <text class="clip-time-text">{{clip.durationText}}</text>
+                      </view>
+
+                      <!-- 真实声波轮廓 (真实密集声学波形，静止精准标定声音位置) -->
+                      <view class="clip-wave-bars">
+                        <view
+                          wx:for="{{clip.waveBars}}"
+                          wx:key="id"
+                          class="cw-bar"
+                          style="height: {{item.h || item}}%;"
+                        ></view>
+                      </view>
+
+                      <!-- 状态小标签（重复片段隐藏冗余文字，保持纯净波形视觉） -->
+                      <view wx:if="{{!clip.isDuplicate}}" class="clip-footer-tags">
+                        <text class="clip-grip-hint">⋮⋮ 平移</text>
+                        <text wx:if="{{clip.speedText}}" class="clip-mini-tag">{{clip.speedText}}</text>
+                        <text wx:if="{{clip.eqPreset !== 'flat'}}" class="clip-mini-tag">{{clip.eqLabel}}</text>
+                        <text wx:if="{{clip.denoiseText}}" class="clip-mini-tag">降噪</text>
+                        <text wx:if="{{clip.volumeText}}" class="clip-mini-tag">{{clip.volumeText}}</text>
+                        <text wx:if="{{clip.hasFade}}" class="clip-mini-tag">{{clip.fadeLabel}}</text>
+                      </view>
+                    </view>
+
+                    <!-- 选中修剪把手 (Trim Out Handle) - 直接拖动完成裁剪 -->
+                    <view
+                      wx:if="{{clip.isSelected}}"
+                      class="trim-handle trim-out {{isTrimmingClip && trimType === 'out' ? 'active' : ''}}"
+                      catchtouchstart="onTrimOutTouchStart"
+                      catchtouchmove="onTrimOutTouchMove"
+                      catchtouchend="onTrimOutTouchEnd"
+                      catchtouchcancel="onTrimOutTouchEnd"
+                    >
+                      <view class="trim-grip-bars">
+                        <text class="trim-bar"></text>
+                        <text class="trim-bar"></text>
+                      </view>
+                    </view>
+
+                    <!-- 金色选中发光边 -->
+                    <view wx:if="{{clip.isSelected}}" class="clip-gold-glow"></view>
+                  </view>
+
+                  <!-- 在当前轨道尾部拼入音频按钮 (Append Audio Button) -->
+                  <view
+                    class="append-audio-btn"
+                    style="left: {{track.addAudioLeftRpx + 12}}rpx;"
+                    data-track="{{track.id}}"
+                    catchtap="addAudioToTrack"
+                  >
+                    <text class="append-icon">+</text>
+                    <text class="append-label">拼入音频</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+
+            <!-- 贯穿全轨的红色播放指针 (Signal Red CTI Needle) -->
+            <view class="nle-universal-playhead {{isPlaying ? 'playing' : ''}}" style="left: {{timelineData.playheadRpx}}rpx;">
+              <view class="playhead-cap"></view>
+              <view class="playhead-line"></view>
+            </view>
+
+          </view>
+        </scroll-view>
+      </view>
+
+      <!-- 3. 选中片段高频拼接操作栏 (Professional Clip Editing Bar) -->
+      <view class="clip-splicing-action-bar">
+        <!-- 同轨片段碰撞重叠预警横幅与一键顺延/换轨处置 -->
+        <view wx:if="{{selectedClip.isOverlapping}}" class="clip-overlap-alert-banner">
+          <view class="overlap-alert-left">
+            <text class="alert-icon">⚠️</text>
+            <view class="alert-info-col">
+              <text class="alert-title">片段与同轨音频重叠 {{selectedClip.overlapDeltaSec}}s</text>
+              <text class="alert-desc">导出时将产生声音交叠，建议一键顺延错开或分轨</text>
+            </view>
+          </view>
+          <view class="overlap-alert-actions">
+            <view class="alert-action-btn stagger" catchtap="autoStaggerOverlap">🧲 顺延对齐</view>
+            <view class="alert-action-btn new-track" catchtap="moveOverlapToNewTrack">➕ 移至新轨</view>
+          </view>
+        </view>
+        <view class="splicing-bar-header">
+          <view class="selected-clip-badge">
+            <view class="track-tag-pill">{{selectedClip.trackName || '音轨 1'}}</view>
+            <text class="selected-clip-notice">{{selectedClip.sourceName}}</text>
+            <text class="clip-badge-dur-pill">{{selectedClip.durationText}}</text>
+          </view>
+          <view class="splicing-header-pills">
+            <view class="aux-pill-btn {{isPlaying && playMode === 'clip' ? 'playing' : ''}}" bindtap="togglePlayClip">
+              <image class="aux-mono-icon" src="{{isPlaying && playMode === 'clip' ? monoIcons.pause : monoIcons.headphone}}"></image>
+              <text>{{isPlaying && playMode === 'clip' ? '暂停' : '试听'}}</text>
+            </view>
+            <view class="aux-pill-btn mixer-btn" data-tab="eq" bindtap="openInspectorDrawer">
+              <image class="aux-mono-icon" src="{{monoIcons.mixer}}"></image>
+              <text>调音台</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 现代化双端精准修剪仪表盘 (告别折行、左右对称、触控丝滑) -->
+        <view class="clip-trim-dashboard">
+          <!-- 左端：入点时间与微调 -->
+          <view class="trim-endpoint-group head">
+            <view class="trim-nudge-btn" data-delta="0.2" bindtap="nudgeClipHead" hover-class="nudge-btn-active">
+              <text class="nudge-arrow">◀</text>
+              <text class="nudge-text">微调</text>
+            </view>
+            <view class="trim-time-content">
+              <text class="trim-label-sub">入点</text>
+              <text class="trim-time-mono">{{selectedClip.inText || '00:00.0'}}</text>
+            </view>
+          </view>
+
+          <!-- 中段：时长指示与拖拽导引线 -->
+          <view class="trim-span-bridge">
+            <view class="span-dash-line left"></view>
+            <view class="span-indicator-pill">
+              <text class="span-dur-val">{{selectedClip.durationText}}</text>
+              <text class="span-guide-tip">把手拖拽</text>
+            </view>
+            <view class="span-dash-line right"></view>
+          </view>
+
+          <!-- 右端：出点时间与微调 -->
+          <view class="trim-endpoint-group tail">
+            <view class="trim-time-content text-right">
+              <text class="trim-label-sub">出点</text>
+              <text class="trim-time-mono">{{selectedClip.outText || '00:00.0'}}</text>
+            </view>
+            <view class="trim-nudge-btn" data-delta="-0.2" bindtap="nudgeClipTail" hover-class="nudge-btn-active">
+              <text class="nudge-text">微调</text>
+              <text class="nudge-arrow">▶</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 专业级功能剪辑动作缎带 (单色图标精简设计) -->
+        <view class="pro-tools-ribbon-wrapper">
+          <scroll-view scroll-x class="pro-tools-ribbon-scroll" enable-flex>
+            <view class="pro-tools-ribbon">
+              <view class="pro-tool-item primary" bindtap="splitSelectedClipAtPlayhead">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.splitWhite}}"></image>
+                <text class="pro-tool-name">光标剪开</text>
+              </view>
+              <view class="pro-tool-item {{selectedClipSpeed !== 1.0 ? 'active' : ''}}" data-tab="speed" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.speed}}"></image>
+                <text class="pro-tool-name">变速{{selectedClipSpeed !== 1.0 ? ' ' + selectedClipSpeed + 'x' : ''}}</text>
+              </view>
+              <view class="pro-tool-item {{selectedClipGainDb ? 'active' : ''}}" data-tab="volume" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.volume}}"></image>
+                <text class="pro-tool-name">音量{{selectedClipGainDb ? ' ' + selectedClipGainText : ''}}</text>
+              </view>
+              <view class="pro-tool-item" data-tab="fade" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.fade}}"></image>
+                <text class="pro-tool-name">淡入淡出</text>
+              </view>
+              <view class="pro-tool-item" data-tab="denoise" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.denoise}}"></image>
+                <text class="pro-tool-name">智能降噪</text>
+              </view>
+              <view class="pro-tool-item" data-tab="eq" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.eq}}"></image>
+                <text class="pro-tool-name">声音EQ</text>
+              </view>
+              <view class="pro-tool-item" bindtap="alignClipToPlayhead">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.magnet}}"></image>
+                <text class="pro-tool-name">对齐光标</text>
+              </view>
+              <view class="pro-tool-item" data-tab="track" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.track}}"></image>
+                <text class="pro-tool-name">换音轨</text>
+              </view>
+              <view class="pro-tool-item" bindtap="cropToSelection">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.crop}}"></image>
+                <text class="pro-tool-name">裁至选区</text>
+              </view>
+              <view class="pro-tool-item" bindtap="copySelectedClip">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.copy}}"></image>
+                <text class="pro-tool-name">复制</text>
+              </view>
+              <view class="pro-tool-item {{hasClipboard ? 'clipboard-ready' : 'disabled'}}" bindtap="pasteClip">
+                <image class="pro-tool-mono-icon" src="{{hasClipboard ? monoIcons.pasteWhite : monoIcons.paste}}"></image>
+                <text class="pro-tool-name">{{hasClipboard ? '粘贴(就绪)' : '粘贴'}}</text>
+              </view>
+              <view class="pro-tool-item" data-tab="compress" bindtap="openInspectorDrawer">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.compress}}"></image>
+                <text class="pro-tool-name">压缩大小</text>
+              </view>
+              <view class="pro-tool-item" bindtap="moveClipEarlier">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.prev}}"></image>
+                <text class="pro-tool-name">前移</text>
+              </view>
+              <view class="pro-tool-item" bindtap="moveClipLater">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.next}}"></image>
+                <text class="pro-tool-name">后移</text>
+              </view>
+              <view class="pro-tool-item danger" bindtap="deleteSelectedClip">
+                <image class="pro-tool-mono-icon" src="{{monoIcons.trash}}"></image>
+                <text class="pro-tool-name">删除</text>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+
+    </view>
+
+    <!-- 核心工作区三：内置声音处理工具箱 (Built-in Audio Tools Inspector) -->
+    <view class="card-panel sound-inspector-panel">
+      <!-- 检查器头部与展开/折叠切换 -->
+      <view class="inspector-header" bindtap="toggleInspectorExpanded">
+        <view class="inspector-title-group">
+          <view class="inspector-title-left">
+            <text class="inspector-title">声音处理工具箱</text>
+            <text class="inspector-toggle-tag">{{isInspectorExpanded ? '收起 ▲' : '展开调音 ▾'}}</text>
+          </view>
+          <text class="inspector-target">针对：{{selectedClip.trackId || '音轨 1'}} · {{selectedClip.sourceName}}</text>
+        </view>
+        <view wx:if="{{isInspectorExpanded}}" class="inspector-tab-bar" catchtap="preventBubble">
+          <view class="tab-chip {{inspectorTab === 'effects' ? 'active' : ''}}" data-tab="effects" catchtap="switchInspectorTab">🎛️ 音效处理</view>
+          <view class="tab-chip {{inspectorTab === 'fade' ? 'active' : ''}}" data-tab="fade" catchtap="switchInspectorTab">📈 缓入缓出</view>
+          <view class="tab-chip {{inspectorTab === 'track' ? 'active' : ''}}" data-tab="track" catchtap="switchInspectorTab">🎼 音轨分派</view>
+        </view>
+      </view>
+
+      <!-- 折叠态：轻量紧凑参数摘要，不霸屏 -->
+      <view wx:if="{{!isInspectorExpanded}}" class="inspector-compact-summary" bindtap="toggleInspectorExpanded">
+        <view class="compact-params-grid">
+          <view class="compact-param-chip">
+            <text class="compact-label">变速</text>
+            <text class="compact-val">{{selectedClipSpeed}}x</text>
+          </view>
+          <view class="compact-param-chip">
+            <text class="compact-label">EQ</text>
+            <text class="compact-val">{{selectedClip.eqLabel || '原声'}}</text>
+          </view>
+          <view class="compact-param-chip">
+            <text class="compact-label">降噪</text>
+            <text class="compact-val">{{selectedClipDenoise ? selectedClipDenoise + 'dB' : '关'}}</text>
+          </view>
+          <view class="compact-param-chip">
+            <text class="compact-label">增益</text>
+            <text class="compact-val">{{selectedClipGainText || '0 dB'}}</text>
+          </view>
+        </view>
+        <view class="compact-expand-pill">
+          <text>展开参数调节 ▾</text>
+        </view>
+      </view>
+
+      <!-- 展开态：Tab 1: 音效处理 (Speed / EQ / Denoise / Gain) -->
+      <view wx:if="{{isInspectorExpanded && inspectorTab === 'effects'}}" class="inspector-content-box">
+        <!-- 1. 变速变调 -->
+        <view class="tool-section">
+          <view class="section-label-line">
+            <text class="section-title">⚡ 播放速度与节奏</text>
+            <text class="section-val">{{selectedClipSpeed}}x 倍速</text>
+          </view>
+          <view class="chips-selector-row">
+            <view
+              wx:for="{{speedOptions}}"
+              wx:key="*this"
+              class="sel-chip {{selectedClipSpeed === item ? 'active' : ''}}"
+              data-value="{{item}}"
+              bindtap="setClipSpeed"
+            >
+              <text>{{item === 1.0 ? '1.0x 标准' : item + 'x'}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 2. 风格声音均衡器 -->
+        <view class="tool-section">
+          <view class="section-label-line">
+            <text class="section-title">🎙️ 声音均衡器 (EQ 预设)</text>
+            <text class="section-val">{{selectedClip.eqLabel || '原声'}}</text>
+          </view>
+          <view class="chips-selector-row wrap">
+            <view
+              wx:for="{{eqPresets}}"
+              wx:key="key"
+              class="sel-chip {{selectedClipEq === item.key ? 'active' : ''}}"
+              data-preset="{{item.key}}"
+              bindtap="setClipEq"
+            >
+              <text class="chip-icon">{{item.icon}}</text>
+              <text>{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 3. 智能降噪 -->
+        <view class="tool-section">
+          <view class="section-label-line">
+            <text class="section-title">🔇 智能降噪消除底噪</text>
+            <text class="section-val">{{selectedClipDenoise ? selectedClipDenoise + ' dB' : '未开启'}}</text>
+          </view>
+          <view class="chips-selector-row">
+            <view
+              wx:for="{{denoiseOptions}}"
+              wx:key="val"
+              class="sel-chip {{selectedClipDenoise === item.val ? 'active' : ''}}"
+              data-value="{{item.val}}"
+              bindtap="setClipDenoise"
+            >
+              <text>{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 4. 片段独立增益 -->
+        <view class="tool-section">
+          <view class="section-label-line">
+            <text class="section-title">🔊 片段独立音量增益</text>
+            <view class="gain-action-group">
+              <text class="section-val highlight">{{selectedClipGainText}}</text>
+              <text class="reset-gain-btn" bindtap="resetClipGain">复位</text>
+            </view>
+          </view>
+          <slider
+            class="custom-slider"
+            min="-24"
+            max="12"
+            step="1"
+            value="{{selectedClipGainDb}}"
+            block-size="16"
+            activeColor="#FF6B00"
+            backgroundColor="#E7E5E4"
+            bindchanging="onClipGainChanging"
+            bindchange="onClipGainChange"
+          />
+        </view>
+      </view>
+
+      <!-- 展开态：Tab 2: 缓入缓出与整体增益 (Fade) -->
+      <view wx:if="{{isInspectorExpanded && inspectorTab === 'fade'}}" class="inspector-content-box">
+        <!-- 淡入选择 -->
+        <view class="tuning-param-block">
+          <text class="param-header-label">片段开头淡入时长</text>
+          <view class="fade-chips-group">
+            <view
+              wx:for="{{fadeOptions}}"
+              wx:key="*this"
+              class="fade-chip {{fadeIn === item ? 'active' : ''}}"
+              data-value="{{item}}"
+              bindtap="onClipFadeInTap"
+            >
+              <text>{{item === 0 ? '无淡入' : item + ' 秒'}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 淡出选择 -->
+        <view class="tuning-param-block">
+          <text class="param-header-label">片段结尾淡出时长</text>
+          <view class="fade-chips-group">
+            <view
+              wx:for="{{fadeOptions}}"
+              wx:key="*this"
+              class="fade-chip {{fadeOut === item ? 'active' : ''}}"
+              data-value="{{item}}"
+              bindtap="onClipFadeOutTap"
+            >
+              <text>{{item === 0 ? '无淡出' : item + ' 秒'}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view wx:if="{{fadeAdjusted}}" class="fade-auto-tip-card">
+          <text class="fade-tip-icon">⚠️</text>
+          <view class="fade-tip-content">
+            <text class="fade-tip-msg">淡入({{fadeIn}}s)+淡出({{fadeOut}}s) 超过片段时长({{selectedClip.durationText}})</text>
+            <text class="fade-tip-sub">导出时将自动按比例平滑自适应为各 {{effectiveFadeInText || fadeIn}} / {{effectiveFadeOutText || fadeOut}}</text>
+          </view>
+        </view>
+
+        <!-- 全局音量 -->
+        <view class="tuning-param-block volume-block">
+          <view class="volume-header-line">
+            <text class="param-header-label">整片全局音量</text>
+            <text class="volume-val-badge">{{volumeText}}</text>
+          </view>
+          <slider
+            class="custom-slider volume-slider"
+            min="-24"
+            max="12"
+            step="1"
+            value="{{volumeDb}}"
+            block-size="16"
+            activeColor="#FF6B00"
+            backgroundColor="#E7E5E4"
+            bindchanging="onVolumeChanging"
+            bindchange="onVolumeChange"
+          />
+          <text class="volume-footer-hint">-24dB ~ +12dB 平滑可调，作用于导出成品整首音频</text>
+        </view>
+      </view>
+
+      <!-- 展开态：Tab 3: 音轨分派与位移 (Track & Position) -->
+      <view wx:if="{{isInspectorExpanded && inspectorTab === 'track'}}" class="inspector-content-box">
+        <view class="tool-section">
+          <text class="section-title">分派到指定音轨</text>
+          <view class="track-assign-row wrap">
+            <view
+              wx:for="{{tracks}}"
+              wx:key="id"
+              class="assign-chip {{selectedClipTrackId === item.id ? 'active' : ''}}"
+              data-track="{{item.id}}"
+              bindtap="setClipTrack"
+              style="border-color: {{selectedClipTrackId === item.id ? item.color : ''}};"
+            >
+              <text class="assign-tag" style="color: {{item.color}};">{{item.tag || item.name}}</text>
+              <text>{{item.name}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="tool-section">
+          <text class="section-title">时间线微调平移</text>
+          <view class="nudge-btn-row">
+            <button class="nudge-pill-btn" data-delta="-0.5" bindtap="nudgeClipOffset">◀ 左移 0.5s</button>
+            <button class="nudge-pill-btn" data-delta="0.5" bindtap="nudgeClipOffset">右移 0.5s ▶</button>
+          </view>
+          <text class="nudge-tip">轻微平移当前片段在音轨上的起跑时间，方便与伴奏对齐节奏。</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 声音效果器独立抽屉 (Sliding Audio Inspector Bottom Sheet Drawer) -->
+    <view wx:if="{{showInspectorDrawer}}" class="drawer-modal-backdrop" catchtap="closeInspectorDrawer">
+      <view class="drawer-sheet-card" catchtap="preventBubble">
+        <view class="drawer-grab-bar"></view>
+        <view class="drawer-header-row">
+          <view class="drawer-title-group">
+            <text class="drawer-title">🎛️ 声音处理工具箱</text>
+            <text class="drawer-subtitle">针对选中：{{selectedClip.trackId || 'A1'}} 轨 · {{selectedClip.sourceName}}</text>
+          </view>
+          <view class="drawer-close-btn" bindtap="closeInspectorDrawer">完成</view>
+        </view>
+
+        <!-- 选项卡与控制内容 (横向滚动支持全量专业分类) -->
+        <scroll-view scroll-x class="drawer-tabs-scroll" enable-flex>
+          <view class="inspector-tab-bar">
+            <view class="tab-chip {{inspectorTab === 'speed' ? 'active' : ''}}" data-tab="speed" bindtap="switchInspectorTab">⚡ 变速</view>
+            <view class="tab-chip {{inspectorTab === 'volume' ? 'active' : ''}}" data-tab="volume" bindtap="switchInspectorTab">🔊 音量</view>
+            <view class="tab-chip {{inspectorTab === 'compress' ? 'active' : ''}}" data-tab="compress" bindtap="switchInspectorTab">🎚️ 压缩大小</view>
+            <view class="tab-chip {{inspectorTab === 'fade' ? 'active' : ''}}" data-tab="fade" bindtap="switchInspectorTab">📈 淡化</view>
+            <view class="tab-chip {{inspectorTab === 'denoise' ? 'active' : ''}}" data-tab="denoise" bindtap="switchInspectorTab">🔇 降噪</view>
+            <view class="tab-chip {{inspectorTab === 'eq' || inspectorTab === 'effects' ? 'active' : ''}}" data-tab="eq" bindtap="switchInspectorTab">🎙️ 调音EQ</view>
+            <view class="tab-chip {{inspectorTab === 'track' ? 'active' : ''}}" data-tab="track" bindtap="switchInspectorTab">🎼 音轨</view>
+          </view>
+        </scroll-view>
+
+        <!-- 抽屉内的内容展示 -->
+        <scroll-view scroll-y class="drawer-scroll-body">
+          <!-- 1. 变速变调 -->
+          <block wx:if="{{inspectorTab === 'speed' || inspectorTab === 'effects'}}">
+            <view class="tool-section">
+              <view class="section-label-line">
+                <text class="section-title">⚡ 播放速度与节奏</text>
+                <text class="section-val highlight">{{selectedClipSpeed}}x 倍速</text>
+              </view>
+              <view class="chips-selector-row">
+                <view
+                  wx:for="{{speedOptions}}"
+                  wx:key="*this"
+                  class="sel-chip {{selectedClipSpeed === item ? 'active' : ''}}"
+                  data-value="{{item}}"
+                  bindtap="setClipSpeed"
+                >
+                  <text>{{item === 1.0 ? '1.0x 标准' : item + 'x'}}</text>
+                </view>
+              </view>
+              <text class="section-hint-text">通过 atempo 高保真重采样变频，加速减速均保持原音调无破音。</text>
+            </view>
+          </block>
+
+          <!-- 2. 音量与独立增益 -->
+          <block wx:if="{{inspectorTab === 'volume' || inspectorTab === 'effects'}}">
+            <view class="tool-section">
+              <view class="section-label-line">
+                <text class="section-title">🔊 片段独立音量增益</text>
+                <view class="gain-action-group">
+                  <text class="section-val highlight">{{selectedClipGainText}}</text>
+                  <text class="reset-gain-btn" bindtap="resetClipGain">复位0dB</text>
+                </view>
+              </view>
+              <slider
+                class="custom-slider"
+                min="-24"
+                max="12"
+                step="1"
+                value="{{selectedClipGainDb}}"
+                block-size="16"
+                activeColor="#FF6B00"
+                backgroundColor="#E7E5E4"
+                bindchanging="onClipGainChanging"
+                bindchange="onClipGainChange"
+              />
+              <text class="section-hint-text">-24dB ~ +12dB (10% ~ 200%) 细腻增益，内置限幅防爆音保护。</text>
+            </view>
+          </block>
+
+          <!-- 3. EQ 均衡器 -->
+          <block wx:if="{{inspectorTab === 'eq' || inspectorTab === 'effects'}}">
+            <view class="tool-section">
+              <view class="section-label-line">
+                <text class="section-title">🎙️ 声音均衡器 (EQ 预设)</text>
+                <text class="section-val highlight">{{selectedClip.eqLabel || '原声无染'}}</text>
+              </view>
+              <view class="chips-selector-row wrap">
+                <view
+                  wx:for="{{eqPresets}}"
+                  wx:key="key"
+                  class="sel-chip {{selectedClipEq === item.key ? 'active' : ''}}"
+                  data-preset="{{item.key}}"
+                  bindtap="setClipEq"
+                >
+                  <text class="chip-icon">{{item.icon}}</text>
+                  <text>{{item.label}}</text>
+                </view>
+              </view>
+              <text class="section-hint-text">模拟专业硬件调音台曲线：清晰人声凸显对话、澎湃低音强化氛围、明亮空气通透泛音。</text>
+            </view>
+          </block>
+
+          <!-- 4. 智能降噪 -->
+          <block wx:if="{{inspectorTab === 'denoise' || inspectorTab === 'effects'}}">
+            <view class="tool-section">
+              <view class="section-label-line">
+                <text class="section-title">🔇 智能降噪消除底噪</text>
+                <text class="section-val highlight">{{selectedClipDenoise ? selectedClipDenoise + ' dB' : '未开启'}}</text>
+              </view>
+              <view class="chips-selector-row">
+                <view
+                  wx:for="{{denoiseOptions}}"
+                  wx:key="val"
+                  class="sel-chip {{selectedClipDenoise === item.val ? 'active' : ''}}"
+                  data-value="{{item.val}}"
+                  bindtap="setClipDenoise"
+                >
+                  <text>{{item.label}}</text>
+                </view>
+              </view>
+              <text class="section-hint-text">带通智能抑制算法，精准滤除低频空调底噪与高频电流啸叫。</text>
+            </view>
+          </block>
+
+          <!-- 5. 淡入淡出与全局增益 -->
+          <block wx:if="{{inspectorTab === 'fade'}}">
+            <view class="tuning-param-block">
+              <text class="param-header-label">片段开头淡入时长</text>
+              <view class="fade-chips-group">
+                <view
+                  wx:for="{{fadeOptions}}"
+                  wx:key="*this"
+                  class="fade-chip {{fadeIn === item ? 'active' : ''}}"
+                  data-value="{{item}}"
+                  bindtap="onClipFadeInTap"
+                >
+                  <text>{{item === 0 ? '无淡入' : item + ' 秒'}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view class="tuning-param-block">
+              <text class="param-header-label">片段结尾淡出时长</text>
+              <view class="fade-chips-group">
+                <view
+                  wx:for="{{fadeOptions}}"
+                  wx:key="*this"
+                  class="fade-chip {{fadeOut === item ? 'active' : ''}}"
+                  data-value="{{item}}"
+                  bindtap="onClipFadeOutTap"
+                >
+                  <text>{{item === 0 ? '无淡出' : item + ' 秒'}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view wx:if="{{fadeAdjusted}}" class="fade-auto-tip-card">
+          <text class="fade-tip-icon">⚠️</text>
+          <view class="fade-tip-content">
+            <text class="fade-tip-msg">淡入({{fadeIn}}s)+淡出({{fadeOut}}s) 超过片段时长({{selectedClip.durationText}})</text>
+            <text class="fade-tip-sub">导出时将自动按比例平滑自适应为各 {{effectiveFadeInText || fadeIn}} / {{effectiveFadeOutText || fadeOut}}</text>
+          </view>
+        </view>
+
+            <view class="tuning-param-block volume-block">
+              <view class="volume-header-line">
+                <text class="param-header-label">整片全局音量</text>
+                <text class="volume-val-badge">{{volumeText}}</text>
+              </view>
+              <slider
+                class="custom-slider volume-slider"
+                min="-24"
+                max="12"
+                step="1"
+                value="{{volumeDb}}"
+                block-size="16"
+                activeColor="#FF6B00"
+                backgroundColor="#E7E5E4"
+                bindchanging="onVolumeChanging"
+                bindchange="onVolumeChange"
+              />
+            </view>
+          </block>
+
+          <!-- 6. 轨道分派与时间微调 -->
+          <block wx:if="{{inspectorTab === 'track'}}">
+            <view class="tool-section">
+              <text class="section-title">分派到指定音轨</text>
+              <view class="track-assign-row wrap">
+                <view
+                  wx:for="{{tracks}}"
+                  wx:key="id"
+                  class="assign-chip {{selectedClipTrackId === item.id ? 'active' : ''}}"
+                  data-track="{{item.id}}"
+                  bindtap="setClipTrack"
+                  style="border-color: {{selectedClipTrackId === item.id ? item.color : ''}};"
+                >
+                  <text class="assign-tag" style="color: {{item.color}};">{{item.tag || item.name}}</text>
+                  <text>{{item.name}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view class="tool-section">
+              <text class="section-title">时间线微调平移</text>
+              <view class="nudge-btn-row">
+                <button class="nudge-pill-btn" data-delta="-0.5" bindtap="nudgeClipOffset">◀ 左移 0.5s</button>
+                <button class="nudge-pill-btn" data-delta="0.5" bindtap="nudgeClipOffset">右移 0.5s ▶</button>
+              </view>
+              <text class="nudge-tip">轻微平移当前片段在音轨上的起跑时间，方便与伴奏对齐节奏。</text>
+            </view>
+          </block>
+
+          <!-- 7. 成片压缩与文件体积控制 -->
+          <block wx:if="{{inspectorTab === 'compress'}}">
+            <view class="tool-section">
+              <view class="section-label-line">
+                <text class="section-title">🎚️ 导出压缩率与文件大小控制</text>
+                <text class="section-val highlight">预估 {{estimatedFileSizeText}}</text>
+              </view>
+
+              <!-- 实时指标看板 -->
+              <view class="compress-metrics-banner">
+                <view class="compress-metric-col">
+                  <text class="metric-label">预估成片大小</text>
+                  <text class="metric-value-huge">{{estimatedFileSizeText}}</text>
+                </view>
+                <view class="compress-metric-divider"></view>
+                <view class="compress-metric-col">
+                  <text class="metric-label">相比无损体积节省</text>
+                  <text class="metric-value-huge savings">约 {{compressionRatioText}}%</text>
+                </view>
+                <view class="compress-metric-divider"></view>
+                <view class="compress-metric-col">
+                  <text class="metric-label">导出比特率</text>
+                  <text class="metric-value-sub">{{exportBitrate}}</text>
+                </view>
+              </view>
+
+              <!-- 滑块控制压缩率 -->
+              <view class="compress-slider-wrap">
+                <view class="slider-extremes-row">
+                  <text class="slider-extreme-hint">极小体积 (高压缩)</text>
+                  <text class="slider-center-spec">{{exportBitrate}} · {{qualityGradeShort}}</text>
+                  <text class="slider-extreme-hint">极高音质 (低压缩)</text>
+                </view>
+                <slider
+                  class="compress-native-slider"
+                  min="0"
+                  max="5"
+                  step="1"
+                  value="{{exportBitrateIndex}}"
+                  bindchange="onBitrateSliderChange"
+                  bindchanging="onBitrateSliderChanging"
+                  activeColor="#FF6B00"
+                  backgroundColor="#E7E5E4"
+                  block-size="22"
+                  block-color="#1C1917"
+                />
+                <!-- 6 个离散预设按键 -->
+                <view class="bitrate-preset-row">
+                  <view
+                    wx:for="{{bitrateOptionsList}}"
+                    wx:key="value"
+                    class="bitrate-preset-chip {{exportBitrate === item.value ? 'active' : ''}}"
+                    data-index="{{index}}"
+                    bindtap="selectBitratePreset"
+                  >
+                    <text class="preset-chip-rate">{{item.label}}</text>
+                    <text class="preset-chip-tag">{{item.shortDesc}}</text>
+                  </view>
+                </view>
+              </view>
+
+              <view class="compress-panel-footer">
+                <text class="compress-hint-badge">{{qualityGradeText}}</text>
+                <text class="compress-hint-text">{{qualityHintText}}</text>
+              </view>
+            </view>
+          </block>
+        </scroll-view>
+      </view>
+    </view>
+
+    <!-- 悬浮吸底导出与压缩控制栏 (Floating Bottom Export & Compression Dock) -->
+    <view class="floating-export-dock-wrapper">
+      
+      <!-- 可折叠压缩控制与预估面板 -->
+      <view wx:if="{{showCompressionPanel}}" class="dock-compression-panel">
+        <view class="compress-panel-header">
+          <view class="compress-panel-title-row">
+            <image class="compress-title-mono-icon" src="{{monoIcons.compress}}"></image>
+            <text class="compress-panel-title">导出压缩率与文件大小控制</text>
+          </view>
+          <view class="compress-close-pill" bindtap="toggleExportCompressionPanel">收起 ✕</view>
+        </view>
+
+        <!-- 实时大小看板 -->
+        <view class="compress-metrics-banner">
+          <view class="compress-metric-col">
+            <text class="metric-label">预估成片大小</text>
+            <text class="metric-value-huge">{{estimatedFileSizeText}}</text>
+          </view>
+          <view class="compress-metric-divider"></view>
+          <view class="compress-metric-col">
+            <text class="metric-label">相比无损体积节省</text>
+            <text class="metric-value-huge savings">约 {{compressionRatioText}}%</text>
+          </view>
+          <view class="compress-metric-divider"></view>
+          <view class="compress-metric-col">
+            <text class="metric-label">当前码率</text>
+            <text class="metric-value-sub">{{exportBitrate}}</text>
+          </view>
+        </view>
+
+        <!-- 动态滑块 -->
+        <view class="compress-slider-wrap">
+          <view class="slider-extremes-row">
+            <text class="slider-extreme-hint">极小体积 (高压缩)</text>
+            <text class="slider-center-spec">{{exportBitrate}} · {{qualityGradeShort}}</text>
+            <text class="slider-extreme-hint">极高音质 (低压缩)</text>
+          </view>
+          <slider
+            class="compress-native-slider"
+            min="0"
+            max="5"
+            step="1"
+            value="{{exportBitrateIndex}}"
+            bindchange="onBitrateSliderChange"
+            bindchanging="onBitrateSliderChanging"
+            activeColor="#FF6B00"
+            backgroundColor="#E7E5E4"
+            block-size="22"
+            block-color="#1C1917"
+          />
+          <view class="bitrate-preset-row">
+            <view
+              wx:for="{{bitrateOptionsList}}"
+              wx:key="value"
+              class="bitrate-preset-chip {{exportBitrate === item.value ? 'active' : ''}}"
+              data-index="{{index}}"
+              bindtap="selectBitratePreset"
+            >
+              <text class="preset-chip-rate">{{item.label}}</text>
+              <text class="preset-chip-tag">{{item.shortDesc}}</text>
+            </view>
+          </view>
+        </view>
+
+        <view class="compress-panel-footer">
+          <text class="compress-hint-badge">{{qualityGradeText}}</text>
+          <text class="compress-hint-text">{{qualityHintText}}</text>
+        </view>
+      </view>
+
+      <!-- 吸底底栏 (悬浮晶莹浮岛 Floating Pro Island) -->
+      <view class="floating-export-dock">
+        <!-- 左侧：成片信息与压缩参数交互胶囊 -->
+        <view class="dock-meta-col" bindtap="toggleExportCompressionPanel">
+          <!-- 上行：成片总时长与片段数 (绝对单行，优雅数字排版) -->
+          <view class="dock-headline-row">
+            <text class="dock-duration-val {{isOverDurationCeiling ? 'ceiling-exceeded' : ''}}">{{planDurationText}}</text>
+            <text class="dock-meta-dot">·</text>
+            <text class="dock-clips-meta">共 {{clipCount}} 段</text>
+            <text wx:if="{{isOverDurationCeiling}}" class="dock-ceiling-tag">限额10分</text>
+          </view>
+          
+          <!-- 下行：一体化压缩规格交互药丸 (单行密封胶囊，禁止换行) -->
+          <view wx:if="{{exportTip}}" class="dock-error-row">
+            <text class="dock-error-text">{{exportTip}}</text>
+          </view>
+          <view wx:else class="dock-spec-capsule {{showCompressionPanel ? 'active' : ''}}">
+            <image class="dock-capsule-icon" src="{{monoIcons.compress}}"></image>
+            <text class="dock-spec-bitrate">{{exportBitrate}}</text>
+            <text class="dock-capsule-sep">|</text>
+            <text class="dock-spec-size">约 {{estimatedFileSizeText}}</text>
+            <text class="dock-spec-savings">省{{compressionRatioText}}%</text>
+            <text class="dock-capsule-arrow {{showCompressionPanel ? 'open' : ''}}">▾</text>
+          </view>
+        </view>
+
+        <!-- 右侧：高质感主导出操作按钮 -->
+        <button
+          class="dock-export-action-btn {{exportDisabled ? 'disabled' : ''}}"
+          disabled="{{exportDisabled}}"
+          bindtap="startExport"
+        >
+          <text class="export-btn-sparkle">{{isOverDurationCeiling ? '⚠️' : '⚡'}}</text>
+          <text class="export-btn-label">{{isOverDurationCeiling ? '时长超限' : '导出 MP3'}}</text>
+        </button>
+      </view>
+    </view>
+
+  </block>
+
+  <!-- ================= 4. 导出中状态 (Exporting Modal Card) ================= -->
+  <block wx:if="{{status === 'exporting'}}">
+    <view class="card-panel exporting-card">
+      <view class="exporting-top">
+        <view class="modern-spinner"></view>
+        <view class="exporting-texts">
+          <text class="exporting-title">正在合成你的专属成片…</text>
+          <text class="exporting-sub">已用时 {{exportElapsed}} 秒</text>
+        </view>
+      </view>
+      
+      <view class="exporting-detail-box">
+        <text class="detail-step">正在精密裁剪 {{clipCount}} 个分段音频，计算每段独立淡入淡出包络与全局增益，并由云端引擎合成渲染为 MP3。</text>
+        <text class="detail-hint">{{exportComplexityHeavy ? '当前包含多轨混音或音频滤镜，云端预计需要 15~35 秒，请保持微信在当前页面运行。' : '通常需要 5~20 秒，请保持微信在当前页面运行。'}}</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- ================= 5. 结果卡片 (Export Victory Card) ================= -->
+  <block wx:if="{{status === 'result' && result}}">
+    <view class="card-panel result-victory-card">
+      
+      <view class="result-top-badge">
+        <view class="result-title-group">
+          <text class="success-icon">✓</text>
+          <text class="success-title">剪辑导出成功！</text>
+        </view>
+        <text wx:if="{{result.costSeconds}}" class="cost-tag">耗时 {{result.costSeconds}} 秒</text>
+      </view>
+
+      <view class="result-name-banner">
+        <text class="result-file-name">{{result.fileName}}</text>
+      </view>
+
+      <!-- 成片规格看板 -->
+      <view class="result-spec-grid">
+        <view class="spec-cell">
+          <text class="spec-label">成片时长</text>
+          <text class="spec-value">{{result.durationText}}</text>
+        </view>
+        <view class="spec-cell">
+          <text class="spec-label">文件体积</text>
+          <text class="spec-value">{{result.sizeText}}</text>
+        </view>
+        <view class="spec-cell">
+          <text class="spec-label">片段数量</text>
+          <text class="spec-value">{{result.clipCount}} 段拼接</text>
+        </view>
+      </view>
+
+      <!-- 成品试听播放器 -->
+      <view class="result-audition-card">
+        <view class="audition-header-row">
+          <view class="audition-title-wrap">
+            <text class="audition-title">🎧 成片原声试听</text>
+            <view wx:if="{{resultPlaying}}" class="audition-playing-badge">
+              <text class="wave-dot-anim"></text>
+              <text class="playing-txt">正在试听中</text>
+            </view>
+          </view>
+          <text wx:if="{{resultTempReady}}" class="status-ready-tag">本地就绪 · 零缓冲</text>
+          <text wx:else class="status-loading-tag">云端准备中...</text>
+        </view>
+
+        <view class="audition-inline-player">
+          <view class="audition-play-btn {{resultPlaying ? 'playing' : ''}}" bindtap="toggleResultPlay">
+            <text class="play-icon">{{resultPlaying ? '⏸' : '▶'}}</text>
+          </view>
+          <view class="audition-progress-area">
+            <slider 
+              class="custom-slider" 
+              min="0" 
+              max="{{resultDuration || 100}}" 
+              value="{{resultCurrentTime}}" 
+              bindchange="onResultSeek"
+              block-size="16"
+              activeColor="#16A34A"
+              backgroundColor="#E7E5E4"
+            />
+            <view class="audition-time-row">
+              <text class="time-item">{{resultCurrentText || '00:00'}}</text>
+              <text class="time-item">{{resultDurationText || '00:00'}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 操作导出按钮组 -->
+      <view class="result-actions-grid">
+        <button class="primary-share-btn" bindtap="shareResult">
+          <text class="btn-icon">🚀</text>
+          <text>转发给好友</text>
+        </button>
+      </view>
+
+      <view class="result-sub-actions">
+        <view class="aux-link" bindtap="reEdit">
+          <text class="aux-icon">✏️</text>
+          <text>继续微调编辑</text>
+        </view>
+        <view class="aux-link reset" bindtap="restartEditing">
+          <text class="aux-icon">🔄</text>
+          <text>再剪一首新音频</text>
+        </view>
+      </view>
+
+      <text class="result-expiry-tip">🔒 云端成果音频保留 24 小时；转发至微信「文件传输助手」，可在聊天中直接长按保存到本地。</text>
+    </view>
+  </block>
+
+  <!-- 空态底部安全说明 -->
+  <view wx:if="{{status === 'empty'}}" class="footer-privacy-text">
+    <text>🔒 隐私承诺：所有音频素材仅用于本次剪辑，24 小时后自动销毁</text>
+  </view>
+
+  <!-- 隐私授权弹窗 (Privacy Modal) -->
+  <view wx:if="{{showPrivacy}}" class="modal-backdrop" catchtap="preventBubble">
+    <view class="privacy-dialog-card">
+      <view class="privacy-dialog-icon">🔐</view>
+      <text class="privacy-dialog-title">用户隐私保护提示</text>
+      <text class="privacy-dialog-content">
+        使用剪辑功能前，请阅读并同意《隐私政策》。我们仅在你自主选择音频后上传处理，文件仅用于本次剪辑合成，并在 24 小时内彻底物理销毁；绝不用于任何其他商业用途。
+      </text>
+      <view class="privacy-dialog-link" bindtap="openPrivacyContract">查看《隐私政策》</view>
+      <view class="privacy-dialog-actions">
+        <button class="dialog-btn disagree" id="editor-disagree-btn" bindtap="handleDisagreePrivacy">不同意</button>
+        <button class="dialog-btn agree" id="editor-agree-btn" bindtap="handleAgreePrivacy">同意并继续</button>
+      </view>
+    </view>
+  </view>
+
+</view>
