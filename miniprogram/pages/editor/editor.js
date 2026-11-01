@@ -5,6 +5,7 @@
 
 const editorUtils = require('../../utils/editor-utils.js');
 const monoIcons = require('../../utils/mono-icons.js');
+const libraryStore = require('../../utils/library-store.js');
 
 // 状态机：empty → uploading / analyzing → editing → exporting → result
 const STATUS = {
@@ -247,8 +248,51 @@ Page({
     };
     if (wx.onWindowResize) wx.onWindowResize(this._onWindowResize);
 
+    if (wx.showShareMenu) {
+      try { wx.showShareMenu({ menus: ['shareAppMessage'] }); } catch (e) {}
+    }
+
+    // 从「现场录音」页跳转而来：优先消费录音临时文件（避免再弹草稿恢复）
+    if (this.consumePendingAudio()) return;
+
     // 检查并提示恢复未完成的草稿工程
     this.checkAndPromptRestoreDraft();
+  },
+
+  /** 消费「现场录音」页传入的一次性音频；命中并开始导入时返回 true */
+  consumePendingAudio() {
+    let appInstance = null;
+    try { appInstance = getApp(); } catch (e) {}
+    const pending = appInstance && appInstance.globalData && appInstance.globalData.pendingAudio;
+    if (!pending || !pending.path) return false;
+    appInstance.globalData.pendingAudio = null;
+    const name = pending.name || '现场录音.mp3';
+    const extMatch = String(name).match(/\.([a-zA-Z0-9]+)$/);
+    const ext = (pending.extLower || (extMatch ? extMatch[1] : 'mp3')).toLowerCase();
+    const file = { path: pending.path, name: name, size: Number(pending.size) || 0 };
+    const check = editorUtils.validateLocalFile(file, { maxBytes: MAX_FILE_BYTES });
+    if (!check.ok) {
+      wx.showModal({
+        title: '录音无法导入',
+        content: check.message || '录音文件异常，请重新录制。',
+        showCancel: false,
+      });
+      return false;
+    }
+    wx.showToast({ title: '录音已就绪，正在分析…', icon: 'none' });
+    this.nextTick(() => this.importFiles([{ file: file, ext: check.ext }]));
+    return true;
+  },
+
+  goRecord() {
+    wx.navigateTo({ url: '/pages/record/record?from=editor' });
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '在线多轨剪辑 · 手机上也能精细剪音频',
+      path: '/pages/editor/editor',
+    };
   },
 
   onReady() {
@@ -4453,6 +4497,21 @@ Page({
       costSeconds: data.costMs ? (Number(data.costMs) / 1000).toFixed(1) : '',
       clipCount: this.clips.length,
     };
+    // v5.1：导出成果写入「我的作品」库（失败不阻断导出主流程）
+    try {
+      libraryStore.addToLibrary(
+        libraryStore.itemFromEdit({
+          fileName: result.fileName,
+          size: result.size,
+          sizeText: result.sizeText,
+          durationText: result.durationText,
+          fileID: result.fileID,
+          clipCount: result.clipCount,
+        })
+      );
+    } catch (e) {
+      console.warn('[editor] 作品库写入失败', e);
+    }
     this.releaseWaveCanvas();
     this.resultTempFilePath = '';
     this._preparingFileID = '';

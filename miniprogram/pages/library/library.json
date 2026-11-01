@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "我的作品",
+  "navigationBarBackgroundColor": "#F8F6F2",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#F8F6F2",
+  "backgroundTextStyle": "dark",
+  "enablePullDownRefresh": false,
+  "usingComponents": {}
+}

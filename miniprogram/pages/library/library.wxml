@@ -1,0 +1,107 @@
+<!-- miniprogram/pages/library/library.wxml -->
+<!-- v5.1 FR-31 我的作品库：统计 / 筛选 / 分享 / 复制外链 / 删除 / 空态三入口 -->
+<view class="page">
+
+  <!-- 1. 顶部：标题 + 统计 + 清空 -->
+  <view class="header">
+    <view class="header-main">
+      <view class="brand-tag">
+        <view class="brand-dot"></view>
+        <text class="brand-tag-text">MY LIBRARY</text>
+      </view>
+      <text class="page-title">我的作品</text>
+      <text class="page-subtitle">{{statsText}}</text>
+    </view>
+    <view wx:if="{{hasItems}}" class="clear-btn" hover-class="clear-btn-hover" bindtap="clearAll">
+      <text class="clear-btn-text">清空</text>
+    </view>
+  </view>
+
+  <!-- 2. 分段筛选器：全部 / 转换 / 剪辑 -->
+  <view wx:if="{{hasItems}}" class="filter-bar">
+    <view
+      wx:for="{{filterTabs}}"
+      wx:key="key"
+      class="filter-tab {{filter === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="setFilter"
+    >
+      <text class="filter-label">{{item.label}}</text>
+      <text wx:if="{{item.count > 0}}" class="filter-count">{{item.count}}</text>
+    </view>
+  </view>
+
+  <!-- 3. 空态：去转换 / 去剪辑 / 现场录音 三个入口 -->
+  <block wx:if="{{empty}}">
+    <view class="empty-state">
+      <view class="empty-illustration">
+        <view class="empty-disc">
+          <view class="empty-disc-groove"></view>
+          <view class="empty-disc-hole"></view>
+        </view>
+        <text class="empty-sparkle">🎵</text>
+      </view>
+      <text class="empty-title">还没有作品</text>
+      <text class="empty-desc">转换或剪辑完成的音频会自动汇总到这里，云端文件保留 24 小时。</text>
+      <view class="empty-actions">
+        <button class="empty-btn primary" bindtap="goIndex">🎵 去转换</button>
+        <button class="empty-btn" bindtap="goEditor">✂️ 去剪辑</button>
+        <button class="empty-btn" bindtap="goRecord">🎙 现场录音</button>
+      </view>
+      <button class="empty-share-btn" open-type="share">分享给好友</button>
+    </view>
+  </block>
+
+  <!-- 4. 筛选后无结果 -->
+  <block wx:elif="{{filterEmpty}}">
+    <view class="filter-empty">
+      <text class="filter-empty-icon">🔍</text>
+      <text class="filter-empty-title">该分类下暂无作品</text>
+      <text class="filter-empty-desc">切换到「全部」看看，或回到工具里新建一个作品。</text>
+    </view>
+  </block>
+
+  <!-- 5. 作品卡片列表 -->
+  <view wx:else class="item-list">
+    <view
+      wx:for="{{filtered}}"
+      wx:key="id"
+      class="item-card {{item.expired ? 'is-expired' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onItemTap"
+    >
+      <view class="item-head">
+        <view class="kind-badge {{item.kindClass}}">{{item.kindLabel}}</view>
+        <text class="item-time">{{item.createdText}}</text>
+      </view>
+
+      <text class="item-name">{{item.name}}</text>
+      <text wx:if="{{item.sourceName && item.sourceName !== item.name}}" class="item-source">来源：{{item.sourceName}}</text>
+
+      <view class="item-meta">
+        <text wx:if="{{item.formatLabel}}" class="meta-chip">{{item.formatLabel}}</text>
+        <text wx:if="{{item.sizeText}}" class="meta-chip">{{item.sizeText}}</text>
+        <text wx:if="{{item.durationText}}" class="meta-chip">{{item.durationText}}</text>
+        <text wx:if="{{item.extraLabel}}" class="meta-chip extra">{{item.extraLabel}}</text>
+      </view>
+
+      <view wx:if="{{item.expired}}" class="expired-tip">
+        <text class="expired-tip-icon">⏳</text>
+        <text class="expired-tip-text">文件已过期（云端仅保留 24 小时）</text>
+      </view>
+
+      <view class="item-actions">
+        <button class="action-btn primary" data-id="{{item.id}}" catchtap="shareItem">分享</button>
+        <button wx:if="{{item.canCopyLink}}" class="action-btn" data-id="{{item.id}}" catchtap="copyLink">复制外链</button>
+        <button wx:if="{{item.expired}}" class="action-btn" data-id="{{item.id}}" catchtap="onItemTap">重新处理</button>
+        <button class="action-btn danger" data-id="{{item.id}}" catchtap="deleteItem">删除</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 6. 底部隐私说明 -->
+  <view class="footer-tip">
+    <text class="footer-tip-line">记录仅保存在本机 · 云端音频文件 24 小时内自动清理</text>
+    <text class="footer-tip-line">删除记录不影响已转发到聊天的文件</text>
+  </view>
+</view>

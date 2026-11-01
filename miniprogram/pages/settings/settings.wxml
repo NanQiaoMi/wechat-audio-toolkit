@@ -1,10 +1,20 @@
 <view class="page">
   <view class="card">
     <view class="section-title">服务说明</view>
-    <view class="row"><text>单文件大小</text><text class="row-value">≤ 50MB</text></view>
-    <view class="row"><text>当前次数</text><text class="row-value">不限次数（测试阶段）</text></view>
+    <view class="row"><text>转换单文件</text><text class="row-value">≤ 50MB</text></view>
+    <view class="row"><text>剪辑成片</text><text class="row-value">≤ 10 分钟</text></view>
+    <view class="row"><text>现场录音</text><text class="row-value">≤ 10 分钟</text></view>
+    <view class="row"><text>使用次数</text><text class="row-value">不限次数（测试阶段）</text></view>
     <view class="row"><text>文件保留</text><text class="row-value">24 小时内自动清理</text></view>
-    <view class="hint">MP3 建议 ≤20 分钟，M4A/OGG/AAC 建议 ≤10 分钟，WAV/FLAC 可到 30 分钟。</view>
+    <view class="hint">转换建议：MP3 ≤20 分钟，M4A/OGG/AAC ≤10 分钟，WAV/FLAC ≤30 分钟。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">功能入口</view>
+    <view class="row link" bindtap="goIndex"><text>格式转换</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="goRecord"><text>现场录音</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="goLibrary"><text>我的作品</text><text class="arrow">›</text></view>
+    <button class="share-row" open-type="share"><text>分享给好友</text><text class="arrow">›</text></button>
   </view>
 
   <view class="card">
@@ -12,14 +22,15 @@
     <view class="row link" bindtap="openPrivacyContract"><text>隐私保护指引</text><text class="arrow">›</text></view>
     <view class="row link" bindtap="showAgreement"><text>用户协议</text><text class="arrow">›</text></view>
     <view class="row link" bindtap="showCopyright"><text>版权与侵权投诉</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="showFeedback"><text>意见反馈</text><text class="arrow">›</text></view>
     <view class="row link" bindtap="showAbout"><text>关于</text><text class="arrow">›</text></view>
   </view>
 
   <view class="card">
     <view class="section-title">数据管理</view>
-    <view class="row link" bindtap="clearHistory"><text>清空历史记录</text><text class="arrow">›</text></view>
+    <view class="row link" bindtap="clearHistory"><text>清空我的作品</text><text class="arrow">›</text></view>
     <view class="row link" bindtap="clearCache"><text>清理本机缓存</text><text class="arrow">›</text></view>
   </view>
 
-  <view class="footer">v{{version}} · 音乐格式转换器</view>
+  <view class="footer">v{{version}} · 音频工具箱</view>
 </view>

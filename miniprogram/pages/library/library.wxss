@@ -1,0 +1,495 @@
+/* miniprogram/pages/library/library.wxss */
+/* v5.1 FR-31 我的作品库 · 沿用暖纸色板（#F8F6F2 画布 / #FFFFFF 卡片 / #1C1917 文字 / #78716C 次文字 / #FF6B00 强调） */
+
+.page {
+  background-color: #F8F6F2;
+  min-height: 100vh;
+  padding: 32rpx 28rpx 80rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  box-sizing: border-box;
+  color: #1C1917;
+}
+
+/* ============================================================
+   1. 顶部标题区与清空入口
+============================================================ */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 4rpx;
+}
+
+.header-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.brand-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  background-color: #F0EDE6;
+  border-radius: 20rpx;
+  padding: 4rpx 14rpx;
+  align-self: flex-start;
+  margin-bottom: 10rpx;
+}
+
+.brand-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background-color: #FF6B00;
+}
+
+.brand-tag-text {
+  font-size: 18rpx;
+  font-weight: 800;
+  color: #78716C;
+  letter-spacing: 1.5rpx;
+}
+
+.page-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #1C1917;
+  letter-spacing: -0.5rpx;
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-size: 24rpx;
+  color: #78716C;
+  margin-top: 8rpx;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 20rpx;
+  margin-top: 46rpx;
+  padding: 12rpx 24rpx;
+  border-radius: 22rpx;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.clear-btn-hover {
+  opacity: 0.6;
+}
+
+.clear-btn-text {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #78716C;
+}
+
+/* ============================================================
+   2. 分段筛选器（全部 / 转换 / 剪辑）
+============================================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 24rpx;
+  padding: 6rpx;
+  box-shadow: 0 2rpx 14rpx rgba(28, 25, 23, 0.04);
+}
+
+.filter-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 16rpx 0;
+  border-radius: 18rpx;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.filter-tab.active {
+  background-color: #1C1917;
+}
+
+.filter-label {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #78716C;
+}
+
+.filter-tab.active .filter-label {
+  color: #FFFFFF;
+}
+
+.filter-count {
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #78716C;
+  background-color: #F0EDE6;
+  border-radius: 18rpx;
+  padding: 0 10rpx;
+  line-height: 30rpx;
+}
+
+.filter-tab.active .filter-count {
+  color: #1C1917;
+  background-color: #FF6B00;
+}
+
+/* ============================================================
+   3. 空态（三角入口）
+============================================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #FFFFFF;
+  border: 1px dashed rgba(0, 0, 0, 0.08);
+  border-radius: 32rpx;
+  padding: 56rpx 32rpx 40rpx;
+  box-shadow: 0 4rpx 24rpx rgba(28, 25, 23, 0.04);
+}
+
+.empty-illustration {
+  position: relative;
+  width: 152rpx;
+  height: 152rpx;
+  margin-bottom: 28rpx;
+}
+
+.empty-disc {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 152rpx;
+  height: 152rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F0EDE6 0%, #FFFFFF 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 0 0 10rpx rgba(255, 107, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-disc-groove {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 50%;
+  border: 2rpx dashed rgba(120, 113, 108, 0.28);
+}
+
+.empty-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22rpx;
+  height: 22rpx;
+  margin-left: -11rpx;
+  margin-top: -11rpx;
+  border-radius: 50%;
+  background-color: #FF6B00;
+  box-shadow: 0 2rpx 8rpx rgba(255, 107, 0, 0.3);
+}
+
+.empty-sparkle {
+  position: absolute;
+  right: -8rpx;
+  bottom: 2rpx;
+  font-size: 44rpx;
+  line-height: 1;
+}
+
+.empty-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #1C1917;
+  letter-spacing: 0.5rpx;
+}
+
+.empty-desc {
+  font-size: 24rpx;
+  color: #78716C;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.6;
+  margin-top: 12rpx;
+  padding: 0 16rpx;
+}
+
+.empty-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 12rpx;
+  width: 100%;
+  margin-top: 36rpx;
+}
+
+.empty-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 8rpx;
+  border-radius: 22rpx;
+  background-color: #F8F6F2;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1C1917;
+  line-height: 1.2;
+}
+
+.empty-btn.primary {
+  background-color: #FF6B00;
+  border-color: #FF6B00;
+  color: #FFFFFF;
+  box-shadow: 0 4rpx 16rpx rgba(255, 107, 0, 0.24);
+}
+
+.empty-btn:active {
+  opacity: 0.7;
+}
+
+.empty-share-btn {
+  margin-top: 24rpx;
+  padding: 12rpx 24rpx;
+  background-color: transparent;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #FF6B00;
+  line-height: 1.2;
+}
+
+.empty-share-btn:active {
+  opacity: 0.6;
+}
+
+/* 筛选后无结果 */
+.filter-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 28rpx;
+  padding: 64rpx 32rpx;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.filter-empty-icon {
+  font-size: 48rpx;
+  margin-bottom: 16rpx;
+}
+
+.filter-empty-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1C1917;
+}
+
+.filter-empty-desc {
+  font-size: 24rpx;
+  color: #78716C;
+  margin-top: 10rpx;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   4. 作品卡片列表
+============================================================ */
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 28rpx;
+  padding: 28rpx 28rpx 20rpx;
+  box-shadow: 0 2rpx 16rpx rgba(28, 25, 23, 0.05);
+}
+
+.item-card:active {
+  background-color: #FCFBF9;
+}
+
+.item-card.is-expired {
+  background-color: #F7F5F1;
+  border-color: rgba(0, 0, 0, 0.04);
+  box-shadow: none;
+}
+
+.item-card.is-expired .item-name {
+  color: #78716C;
+}
+
+.item-card.is-expired .meta-chip {
+  color: #A8A29E;
+}
+
+.item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.kind-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 16rpx;
+  border-radius: 18rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  letter-spacing: 0.5rpx;
+}
+
+.kind-badge.kind-convert {
+  background-color: #FFF7ED;
+  color: #FF6B00;
+}
+
+.kind-badge.kind-edit {
+  background-color: #F0EDE6;
+  color: #57534E;
+}
+
+.item-time {
+  font-size: 20rpx;
+  color: #A8A29E;
+  font-weight: 500;
+}
+
+.item-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1C1917;
+  line-height: 1.35;
+  word-break: break-all;
+}
+
+.item-source {
+  font-size: 22rpx;
+  color: #78716C;
+  font-weight: 500;
+  margin-top: 8rpx;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 18rpx;
+}
+
+.meta-chip {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #57534E;
+  background-color: #F8F6F2;
+  border-radius: 14rpx;
+  padding: 6rpx 14rpx;
+  line-height: 1.2;
+}
+
+.meta-chip.extra {
+  color: #FF6B00;
+  background-color: #FFF7ED;
+}
+
+.expired-tip {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 18rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 16rpx;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.expired-tip-icon {
+  font-size: 22rpx;
+}
+
+.expired-tip-text {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #78716C;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 22rpx;
+  padding-top: 18rpx;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx 8rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #1C1917;
+  background-color: #F8F6F2;
+  line-height: 1.2;
+}
+
+.action-btn.primary {
+  background-color: #FF6B00;
+  color: #FFFFFF;
+  box-shadow: 0 4rpx 14rpx rgba(255, 107, 0, 0.22);
+}
+
+.action-btn.danger {
+  background-color: #FEF2F2;
+  color: #DC2626;
+}
+
+.action-btn:active {
+  opacity: 0.7;
+}
+
+/* ============================================================
+   5. 底部说明
+============================================================ */
+.footer-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  padding: 24rpx 16rpx 8rpx;
+}
+
+.footer-tip-line {
+  font-size: 20rpx;
+  color: #A8A29E;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.5;
+}

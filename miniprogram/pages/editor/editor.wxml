@@ -48,6 +48,10 @@
           <text class="action-pill-plus">+</text>
           <text class="action-pill-text">从微信选择音频</text>
         </button>
+        <button class="record-entry-pill" bindtap="goRecord">
+          <text class="record-entry-icon">🎙</text>
+          <text class="record-entry-text">现场录音</text>
+        </button>
       </view>
 
       <!-- 规格说明气泡标签 -->
@@ -1430,7 +1434,7 @@
 
   <!-- 空态底部安全说明 -->
   <view wx:if="{{status === 'empty'}}" class="footer-privacy-text">
-    <text>🔒 隐私承诺：所有音频素材仅用于本次剪辑，24 小时后自动销毁</text>
+    <text>🔒 隐私承诺：所有音频素材仅用于本次剪辑，24 小时内自动清理</text>
   </view>
 
   <!-- 隐私授权弹窗 (Privacy Modal) -->
@@ -1439,7 +1443,7 @@
       <view class="privacy-dialog-icon">🔐</view>
       <text class="privacy-dialog-title">用户隐私保护提示</text>
       <text class="privacy-dialog-content">
-        使用剪辑功能前，请阅读并同意《隐私政策》。我们仅在你自主选择音频后上传处理，文件仅用于本次剪辑合成，并在 24 小时内彻底物理销毁；绝不用于任何其他商业用途。
+        使用剪辑功能前，请阅读并同意《隐私政策》。我们仅在你自主选择音频后上传处理，文件仅用于本次剪辑合成，并在 24 小时内自动清理；绝不用于任何其他商业用途。
       </text>
       <view class="privacy-dialog-link" bindtap="openPrivacyContract">查看《隐私政策》</view>
       <view class="privacy-dialog-actions">

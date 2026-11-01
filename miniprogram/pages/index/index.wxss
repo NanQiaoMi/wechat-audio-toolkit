@@ -121,59 +121,49 @@
 }
 
 /* ============================================================
-   2. 剪辑工坊快捷条 (Quick Banner)
+   2. 工具快捷区 (Quick Tools: 剪辑 / 录音 / 作品库)
 ============================================================ */
-.quick-tool-banner {
-  background-color: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 24rpx;
-  padding: 20rpx 28rpx;
+.quick-tools-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.02);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.quick-tool-banner:active {
-  transform: scale(0.985);
-  background-color: #FAF8F5;
-}
-
-.tool-banner-left {
-  display: flex;
-  align-items: center;
   gap: 16rpx;
 }
 
-.tool-banner-icon {
-  font-size: 36rpx;
-}
-
-.tool-banner-text {
+.quick-tool-card {
+  flex: 1;
+  min-width: 0;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 24rpx;
+  padding: 22rpx 12rpx 20rpx;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.02);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease;
 }
 
-.tool-banner-title {
-  font-size: 26rpx;
+.quick-tool-card-hover {
+  transform: scale(0.96) translateY(2rpx);
+  background-color: #FAF8F5;
+}
+
+.qt-icon {
+  font-size: 40rpx;
+  line-height: 1.1;
+}
+
+.qt-title {
+  font-size: 25rpx;
   font-weight: 700;
   color: #1C1917;
+  white-space: nowrap;
 }
 
-.tool-banner-sub {
-  font-size: 20rpx;
+.qt-sub {
+  font-size: 19rpx;
   color: #78716C;
-  margin-top: 2rpx;
-}
-
-.tool-banner-arrow {
-  font-size: 22rpx;
-  font-weight: 600;
-  color: #FF6B00;
-  background-color: #FFF7ED;
-  padding: 6rpx 18rpx;
-  border-radius: 30rpx;
+  white-space: nowrap;
 }
 
 /* ============================================================
