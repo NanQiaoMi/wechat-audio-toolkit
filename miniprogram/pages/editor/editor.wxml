@@ -48,6 +48,10 @@
           <text class="action-pill-plus">+</text>
           <text class="action-pill-text">从微信选择音频</text>
         </button>
+        <button class="video-extract-entry-pill" bindtap="goVideoExtract">
+          <text class="video-extract-entry-icon">🎬</text>
+          <text class="video-extract-entry-text">视频提取</text>
+        </button>
         <button class="record-entry-pill" bindtap="goRecord">
           <text class="record-entry-icon">🎙</text>
           <text class="record-entry-text">现场录音</text>

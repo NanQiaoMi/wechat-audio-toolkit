@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/editor/editor",
     "pages/record/record",
+    "pages/video-extract/video-extract",
     "pages/library/library",
     "pages/settings/settings"
   ],

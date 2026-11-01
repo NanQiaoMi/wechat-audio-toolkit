@@ -603,6 +603,103 @@ async function convertFile(event) {
   }
 }
 
+function formatSecSimple(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0))
+  const m = Math.floor(s / 60)
+  const remainingS = s % 60
+  return `${m < 10 ? '0' + m : m}:${remainingS < 10 ? '0' + remainingS : remainingS}`
+}
+
+function formatBytesSimple(bytes) {
+  const b = Number(bytes) || 0
+  if (b < 1024) return `${b} B`
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`
+}
+
+async function extractVideoAudio(event) {
+  // 视频提取音频专享入口：fileID -> 下载 -> ffmpeg -vn -c:a -> 上传 -> 返回 UI 需要的结构
+  const t0 = Date.now()
+  const fileID = event.fileID
+  const targetFormat = String(event.targetFormat || 'mp3').toLowerCase()
+  const options = event.options || {}
+  const fileName = event.fileName || ''
+  const autoCleanSource = event.autoCleanSource !== false
+  if (!fileID) return { success: false, code: 'PARAM_ERROR', errorMessage: '缺少视频 fileID 参数' }
+
+  const bitrate = ['128k', '192k', '256k', '320k'].includes(options.bitrate) ? options.bitrate : '192k'
+
+  const ts = Date.now()
+  const suffix = `ve_${ts}_${Math.random().toString(36).slice(2, 8)}`
+  const srcExtMatch = String(fileID + ' ' + fileName).match(/\.([a-zA-Z0-9]{1,5})(?:[\s?]|$)/)
+  const srcExt = srcExtMatch ? srcExtMatch[1].toLowerCase() : 'mp4'
+  const inputPath = `/tmp/video_in_${suffix}.${srcExt}`
+  const outExt = targetFormat === 'm4a' ? 'm4a' : 'mp3'
+  const outputPath = `/tmp/audio_out_${suffix}.${outExt}`
+  let outputFileID = ''
+
+  try {
+    const dl = await cloud.downloadFile({ fileID })
+    const buf = Buffer.isBuffer(dl.fileContent) ? dl.fileContent : Buffer.from(dl.fileContent)
+    if (!buf || buf.length === 0) throw new Error('视频源文件为空或下载失败')
+    if (buf.length > 100 * 1024 * 1024) throw new Error('视频超过 100MB 限制，请选取更小的视频')
+    fs.writeFileSync(inputPath, buf)
+
+    const duration = await getDuration(inputPath)
+
+    // 构造 ffmpeg 抽取音频参数：-vn 丢弃视频流，转为高保真音频
+    const audioArgs = outExt === 'm4a'
+      ? ['-c:a', 'aac', '-b:a', bitrate, '-movflags', '+faststart']
+      : ['-c:a', 'libmp3lame', '-b:a', bitrate, '-ar', '44100']
+
+    const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', inputPath, '-vn', ...audioArgs, outputPath]
+    const conv = await runFfmpeg(args, 55000)
+    if (!conv.ok || !fs.existsSync(outputPath)) {
+      throw new Error(`FFmpeg 提取音轨失败: ${conv.error || conv.stderr || '未知错误'}`)
+    }
+
+    const outStat = fs.statSync(outputPath)
+    const outBytes = outStat.size
+    const outDuration = (await getDuration(outputPath)) || duration
+
+    const uploadRes = await cloud.uploadFile({
+      cloudPath: `extracted_audios/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${outExt}`,
+      fileContent: fs.readFileSync(outputPath)
+    })
+    outputFileID = uploadRes.fileID
+
+    if (autoCleanSource) {
+      try { await cloud.deleteFile({ fileList: [fileID] }) } catch (e) {}
+    }
+
+    // 台账记录
+    const ctx = cloud.getWXContext()
+    await recordEditOutput(ctx.OPENID || 'anonymous', outputFileID, outBytes)
+
+    return {
+      success: true,
+      fileID: outputFileID,
+      duration: outDuration,
+      durationText: formatSecSimple(outDuration),
+      size: outBytes,
+      sizeText: formatBytesSimple(outBytes),
+      format: outExt,
+      mode: 'cloud',
+      costMs: Date.now() - t0
+    }
+  } catch (err) {
+    return {
+      success: false,
+      code: 'EXTRACT_FAILED',
+      errorMessage: String(err && err.message || err),
+      costMs: Date.now() - t0
+    }
+  } finally {
+    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath) } catch (e) {}
+    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath) } catch (e) {}
+  }
+}
+
 function baseInfo(action) {
   const info = {
     action,
@@ -733,6 +830,7 @@ exports.main = async (event = {}) => {
     if (action === 'analyzeAudio') return await analyzeAudio(event)
     if (action === 'renderEdit') return await renderEdit(event)
     if (action === 'convertFile') return await convertFile(event)
+    if (action === 'extractVideoAudio') return await extractVideoAudio(event)
     return await probe()
   } catch (e) {
     return { action, error: String((e && e.stack) || e), totalMs: 0 }

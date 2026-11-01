@@ -259,29 +259,35 @@ Page({
     this.checkAndPromptRestoreDraft();
   },
 
-  /** 消费「现场录音」页传入的一次性音频；命中并开始导入时返回 true */
+  /** 消费「现场录音」或「视频提取」页传入的一次性音频；命中并开始导入时返回 true */
   consumePendingAudio() {
     let appInstance = null;
     try { appInstance = getApp(); } catch (e) {}
     const pending = appInstance && appInstance.globalData && appInstance.globalData.pendingAudio;
     if (!pending || !pending.path) return false;
     appInstance.globalData.pendingAudio = null;
-    const name = pending.name || '现场录音.mp3';
+    const isVideo = pending.from === 'video-extract';
+    const name = pending.name || (isVideo ? '视频提取原声.m4a' : '现场录音.mp3');
     const extMatch = String(name).match(/\.([a-zA-Z0-9]+)$/);
     const ext = (pending.extLower || (extMatch ? extMatch[1] : 'mp3')).toLowerCase();
     const file = { path: pending.path, name: name, size: Number(pending.size) || 0 };
     const check = editorUtils.validateLocalFile(file, { maxBytes: MAX_FILE_BYTES });
     if (!check.ok) {
       wx.showModal({
-        title: '录音无法导入',
-        content: check.message || '录音文件异常，请重新录制。',
+        title: isVideo ? '视频音频无法导入' : '录音无法导入',
+        content: check.message || (isVideo ? '视频音轨格式异常。' : '录音文件异常，请重新录制。'),
         showCancel: false,
       });
       return false;
     }
-    wx.showToast({ title: '录音已就绪，正在分析…', icon: 'none' });
+    const toastTitle = isVideo ? '视频原声已就绪，正在导入…' : '录音已就绪，正在分析…';
+    wx.showToast({ title: toastTitle, icon: 'none' });
     this.nextTick(() => this.importFiles([{ file: file, ext: check.ext }]));
     return true;
+  },
+
+  goVideoExtract() {
+    wx.navigateTo({ url: '/pages/video-extract/video-extract?from=editor' });
   },
 
   goRecord() {

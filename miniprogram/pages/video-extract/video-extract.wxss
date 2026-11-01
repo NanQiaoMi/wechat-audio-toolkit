@@ -1,0 +1,655 @@
+/* miniprogram/pages/video-extract/video-extract.wxss */
+/**
+ * 视频提取音频专享页 · 暖纸极简美学
+ * 基础底色：#F8F6F2 / 白卡：#FFFFFF / 炭黑：#1C1917 / 强调：#FF6B00 / 成功：#16A34A
+ */
+
+.container {
+  min-height: 100vh;
+  background-color: #F8F6F2;
+  padding: 30rpx 28rpx calc(50rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+/* ============================================================
+   1. 顶部品牌条
+============================================================ */
+.page-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx;
+}
+
+.topbar-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.topbar-main {
+  font-size: 38rpx;
+  font-weight: 800;
+  color: #1C1917;
+  letter-spacing: -0.5rpx;
+}
+
+.topbar-sub {
+  font-size: 21rpx;
+  color: #78716C;
+  font-weight: 500;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 30rpx;
+  padding: 10rpx 18rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #1C1917;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.02);
+  transition: transform 0.16s ease;
+}
+
+.topbar-pill-btn:active {
+  transform: scale(0.96);
+  background-color: #FAF8F5;
+}
+
+.topbar-pill-icon {
+  font-size: 24rpx;
+}
+
+/* ============================================================
+   通用卡片面板
+============================================================ */
+.card-panel {
+  background-color: #FFFFFF;
+  border: 1px solid #EAE6DF;
+  border-radius: 28rpx;
+  padding: 36rpx 28rpx;
+  box-sizing: border-box;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ============================================================
+   2. 待选视频 Hero 卡片 (Dropzone)
+============================================================ */
+.hero-picker-card {
+  padding: 50rpx 32rpx;
+}
+
+.picker-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
+.picker-clapperboard-icon {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background-color: #FFF7ED;
+  border: 2rpx dashed #FF6B00;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+  position: relative;
+}
+
+.clapperboard-sparkle {
+  font-size: 56rpx;
+  line-height: 1;
+}
+
+.picker-main-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1C1917;
+  margin-bottom: 8rpx;
+}
+
+.picker-sub-title {
+  font-size: 23rpx;
+  color: #78716C;
+  margin-bottom: 36rpx;
+  line-height: 1.4;
+}
+
+.picker-actions-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+  width: 100%;
+  max-width: 580rpx;
+}
+
+.primary-picker-btn {
+  background-color: #1C1917;
+  color: #FFFFFF;
+  border-radius: 44rpx;
+  padding: 24rpx 36rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  box-shadow: 0 6rpx 20rpx rgba(28, 25, 23, 0.15);
+  border: none;
+  line-height: 1.2;
+}
+
+.secondary-picker-btn {
+  background-color: #FAF8F5;
+  color: #1C1917;
+  border: 1px solid #D6D1C7;
+  border-radius: 44rpx;
+  padding: 24rpx 36rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  line-height: 1.2;
+}
+
+.picker-btn-hover {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+.picker-btn-icon {
+  font-size: 32rpx;
+}
+
+.picker-spec-capsule {
+  margin-top: 32rpx;
+  background-color: #F5F3EE;
+  border-radius: 20rpx;
+  padding: 8rpx 20rpx;
+  font-size: 20rpx;
+  color: #78716C;
+  font-weight: 500;
+}
+
+/* ============================================================
+   3. 提取中动画与进度卡片
+============================================================ */
+.extracting-card {
+  padding: 60rpx 32rpx;
+}
+
+.extract-anim-box {
+  width: 130rpx;
+  height: 130rpx;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28rpx;
+}
+
+.extract-pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3rpx solid #FF6B00;
+  opacity: 0.4;
+  animation: pulseRing 1.6s ease-out infinite;
+}
+
+.extract-pulse-ring.ring-2 {
+  animation-delay: 0.5s;
+}
+
+@keyframes pulseRing {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.extract-center-icon {
+  font-size: 54rpx;
+  animation: rotateGlow 2s linear infinite;
+}
+
+@keyframes rotateGlow {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.extract-status-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1C1917;
+  margin-bottom: 8rpx;
+}
+
+.extract-status-sub {
+  font-size: 23rpx;
+  color: #78716C;
+  margin-bottom: 28rpx;
+}
+
+.source-video-preview-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  background-color: #F5F3EE;
+  border-radius: 16rpx;
+  padding: 12rpx 24rpx;
+  margin-bottom: 24rpx;
+  max-width: 520rpx;
+}
+
+.src-vid-name {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #1C1917;
+  max-width: 480rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-vid-meta {
+  font-size: 20rpx;
+  color: #78716C;
+}
+
+.extract-mode-badge {
+  border-radius: 20rpx;
+  padding: 6rpx 18rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.extract-mode-badge.local {
+  background-color: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.extract-mode-badge.cloud {
+  background-color: #FFF7ED;
+  color: #C2410C;
+  border: 1px solid #FED7AA;
+}
+
+/* ============================================================
+   4. 提取成功结果卡片 (Result Card)
+============================================================ */
+.result-card {
+  align-items: stretch;
+  padding: 30rpx 26rpx;
+  gap: 22rpx;
+}
+
+.result-status-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.result-check-badge {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background-color: #16A34A;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.result-title-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.result-headline {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #1C1917;
+}
+
+.result-speed-tag {
+  font-size: 20rpx;
+  color: #16A34A;
+  font-weight: 600;
+}
+
+.repick-btn {
+  background-color: #F5F3EE;
+  border-radius: 20rpx;
+  padding: 8rpx 18rpx;
+  font-size: 22rpx;
+  color: #57534E;
+  font-weight: 600;
+}
+
+.repick-btn:active {
+  background-color: #EAE6DF;
+}
+
+/* 提取元数据横幅 */
+.extracted-meta-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  background-color: #FAF8F5;
+  border: 1px solid #EAE6DF;
+  border-radius: 20rpx;
+  padding: 18rpx 20rpx;
+}
+
+.video-thumb {
+  width: 90rpx;
+  height: 90rpx;
+  border-radius: 14rpx;
+  background-color: #000000;
+  flex-shrink: 0;
+}
+
+.video-thumb-placeholder {
+  width: 90rpx;
+  height: 90rpx;
+  border-radius: 14rpx;
+  background-color: #F0EDE6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  flex-shrink: 0;
+}
+
+.extracted-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.extracted-audio-name {
+  font-size: 25rpx;
+  font-weight: 700;
+  color: #1C1917;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extracted-tags-row {
+  display: flex;
+  gap: 10rpx;
+}
+
+.tag-capsule {
+  border-radius: 8rpx;
+  padding: 2rpx 10rpx;
+  font-size: 19rpx;
+  font-weight: 700;
+}
+
+.tag-capsule.format {
+  background-color: #1C1917;
+  color: #FFFFFF;
+}
+
+.tag-capsule.dur {
+  background-color: #EAE6DF;
+  color: #44403C;
+}
+
+.tag-capsule.size {
+  background-color: #F5F3EE;
+  color: #78716C;
+}
+
+/* 原声高保真试听面板 */
+.audition-player-panel {
+  background-color: #FFFFFF;
+  border: 1px solid #EAE6DF;
+  border-radius: 20rpx;
+  padding: 20rpx 22rpx;
+}
+
+.player-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.player-toggle-btn {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 50%;
+  background-color: #1C1917;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(28, 25, 23, 0.2);
+  transition: transform 0.16s ease;
+}
+
+.player-toggle-btn.playing {
+  background-color: #16A34A;
+  box-shadow: 0 4rpx 12rpx rgba(22, 163, 74, 0.3);
+}
+
+.player-btn-hover {
+  transform: scale(0.92);
+}
+
+.player-btn-glyph {
+  font-size: 30rpx;
+  line-height: 1;
+}
+
+.player-seek-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 4rpx;
+}
+
+.player-time-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6rpx;
+}
+
+.player-time-current {
+  font-size: 21rpx;
+  font-weight: 800;
+  color: #FF6B00;
+  font-family: monospace;
+}
+
+.player-time-total {
+  font-size: 21rpx;
+  color: #78716C;
+  font-family: monospace;
+}
+
+.player-slider {
+  margin: 0;
+  width: 100%;
+}
+
+/* 四大去向操作网格 */
+.next-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
+  margin-top: 6rpx;
+}
+
+.action-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EAE6DF;
+  border-radius: 20rpx;
+  padding: 22rpx 18rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.action-card.primary {
+  border-color: rgba(255, 107, 0, 0.3);
+  background-color: #FFFDF9;
+}
+
+.action-card.secondary {
+  border-color: #E2DDD5;
+  background-color: #FAF8F5;
+}
+
+.action-card.tertiary {
+  border-color: #EAE6DF;
+}
+
+.action-card.quaternary {
+  border-color: #EAE6DF;
+}
+
+.action-card-hover {
+  transform: scale(0.97);
+  background-color: #F5F3EE;
+}
+
+.action-icon-box {
+  font-size: 36rpx;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.action-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.action-name {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #1C1917;
+  white-space: nowrap;
+}
+
+.action-desc {
+  font-size: 18rpx;
+  color: #78716C;
+  white-space: nowrap;
+}
+
+.action-arrow {
+  font-size: 22rpx;
+  color: #A8A29E;
+  flex-shrink: 0;
+}
+
+.action-badge-state {
+  font-size: 18rpx;
+  font-weight: 800;
+  color: #16A34A;
+  background-color: #ECFDF5;
+  border-radius: 8rpx;
+  padding: 2rpx 8rpx;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   5. 错误提示卡片
+============================================================ */
+.error-card {
+  padding: 50rpx 32rpx;
+  text-align: center;
+}
+
+.error-icon-box {
+  font-size: 56rpx;
+  margin-bottom: 16rpx;
+}
+
+.error-main-msg {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #B91C1C;
+  margin-bottom: 8rpx;
+}
+
+.error-detail-msg {
+  font-size: 22rpx;
+  color: #78716C;
+  margin-bottom: 30rpx;
+  line-height: 1.4;
+  max-width: 500rpx;
+}
+
+.error-actions-row {
+  display: flex;
+  justify-content: center;
+}
+
+.pill-btn.primary {
+  background-color: #1C1917;
+  color: #FFFFFF;
+  border-radius: 40rpx;
+  padding: 16rpx 36rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  border: none;
+}
+
+/* ============================================================
+   6. 底部说明
+============================================================ */
+.page-footer {
+  text-align: center;
+  padding: 12rpx 16rpx;
+}
+
+.footer-tip {
+  font-size: 20rpx;
+  color: #A8A29E;
+  line-height: 1.5;
+}

@@ -125,7 +125,7 @@
 ============================================================ */
 .quick-tools-row {
   display: flex;
-  gap: 16rpx;
+  gap: 12rpx;
 }
 
 .quick-tool-card {
@@ -134,7 +134,7 @@
   background-color: #FFFFFF;
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 24rpx;
-  padding: 22rpx 12rpx 20rpx;
+  padding: 20rpx 6rpx 18rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -149,19 +149,19 @@
 }
 
 .qt-icon {
-  font-size: 40rpx;
+  font-size: 38rpx;
   line-height: 1.1;
 }
 
 .qt-title {
-  font-size: 25rpx;
+  font-size: 23rpx;
   font-weight: 700;
   color: #1C1917;
   white-space: nowrap;
 }
 
 .qt-sub {
-  font-size: 19rpx;
+  font-size: 18rpx;
   color: #78716C;
   white-space: nowrap;
 }
