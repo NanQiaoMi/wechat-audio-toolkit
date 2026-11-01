@@ -38,43 +38,133 @@
       <text class="idle-hint">点击开始录音</text>
       <text class="idle-sub">录音会使用本机麦克风，首次使用需授权</text>
       <view class="spec-row">
-        <text class="spec-chip">MP3 · 44.1kHz</text>
-        <text class="spec-chip">立体声 192kbps</text>
+        <text class="spec-chip">PCM 高保真 · 16kHz</text>
+        <text class="spec-chip">原声直录 · 实时声波</text>
         <text class="spec-chip">最长 10 分钟</text>
       </view>
     </view>
 
-    <!-- RECORDING / PAUSED：计时 + 假声波 + 暂停/继续 + 完成 -->
-    <view wx:elif="{{status === 'recording' || status === 'paused'}}" class="active-stage">
-      <view class="status-pill {{status === 'recording' ? 'live' : 'paused'}}">
-        <view class="live-dot"></view>
-        <text>{{status === 'recording' ? '正在录音' : '已暂停'}}</text>
-      </view>
-      <text class="timer-display {{status === 'paused' ? 'is-paused' : ''}}">{{elapsedText}}</text>
-      <view class="wave-wrap {{status === 'recording' ? 'is-live' : 'is-frozen'}}">
-        <view
-          wx:for="{{waveBars}}"
-          wx:key="id"
-          class="wave-bar"
-          style="height: {{item.h}}rpx; animation-delay: {{item.d}}ms;"
-        ></view>
-      </view>
-      <text wx:if="{{interrupted}}" class="interrupted-hint">录音被系统中断，已暂停，点击「继续」恢复</text>
-      <text wx:else class="active-hint">{{status === 'recording' ? '正在录音，最长 10 分钟，到时自动保存' : '计时已暂停，可继续录音或直接完成'}}</text>
-      <view class="control-row">
-        <view wx:if="{{status === 'recording'}}" class="ctrl-btn ghost" bindtap="onPauseRecord" hover-class="btn-hover">
-          <text class="ctrl-icon">⏸</text>
-          <text>暂停</text>
+    <!-- RECORDING：实时物理波形 + 分贝计 + 计时 + 暂停/完成 -->
+    <view wx:elif="{{status === 'recording'}}" class="active-stage">
+      <view class="stage-top-meta">
+        <view class="status-pill live">
+          <view class="live-dot"></view>
+          <text>正在录音</text>
         </view>
-        <view wx:else class="ctrl-btn ghost accent" bindtap="onResumeRecord" hover-class="btn-hover">
-          <text class="ctrl-icon">▶</text>
-          <text>继续</text>
+        <view class="live-decibel-pill {{liveDecibelLevel}}">
+          <text class="live-decibel-icon">🎙️</text>
+          <text class="live-decibel-val">{{liveDecibelText}}</text>
+          <text class="live-decibel-desc">· {{liveDecibelStatus}}</text>
+        </view>
+      </view>
+
+      <text class="timer-display">{{elapsedText}}</text>
+
+      <!-- 实时滚动声波谱线 (28 柱真实振幅能量) -->
+      <view class="live-wave-stage">
+        <view class="live-wave-spectrum">
+          <view
+            wx:for="{{liveWaveBars}}"
+            wx:key="id"
+            class="live-spectrum-bar"
+            style="height: {{item.height}}rpx; opacity: {{item.opacity}};"
+          ></view>
+        </view>
+        <view class="live-wave-baseline"></view>
+      </view>
+
+      <text class="active-hint">正在现场拾音 · 随时可点「暂停」即刻试听回放</text>
+
+      <view class="control-row">
+        <view class="ctrl-btn ghost" bindtap="onPauseRecord" hover-class="btn-hover">
+          <text class="ctrl-icon">⏸</text>
+          <text>暂停并试听</text>
         </view>
         <view class="ctrl-btn finish" bindtap="onFinishRecord" hover-class="btn-hover">
           <text class="ctrl-icon">✓</text>
-          <text>完成</text>
+          <text>完成录音</text>
         </view>
       </view>
+    </view>
+
+    <!-- PAUSED / INTERRUPTED：中断保留 + 随时即时回放试听 + 继续/完成 -->
+    <view wx:elif="{{status === 'paused'}}" class="active-stage paused-stage">
+      <view class="stage-top-meta">
+        <view class="status-pill paused">
+          <view class="live-dot"></view>
+          <text>{{interrupted ? '系统中断挂起' : '录音已挂起'}}</text>
+        </view>
+        <text class="paused-dur-badge">已录 {{elapsedText}}</text>
+      </view>
+
+      <!-- 系统来电/语音中断提示 -->
+      <view wx:if="{{interrupted}}" class="interruption-alert-card">
+        <text class="interruption-alert-icon">⚠️</text>
+        <view class="interruption-alert-body">
+          <text class="interruption-alert-title">录音被电话/系统通话打断</text>
+          <text class="interruption-alert-sub">已为您安全保留前 {{elapsedText}} 录音，可立即试听回放或继续追加录音</text>
+        </view>
+      </view>
+
+      <!-- 中断即刻回放播放器 -->
+      <view class="paused-audition-card">
+        <view class="paused-audition-header">
+          <view class="audition-header-left">
+            <text class="audition-icon">🎧</text>
+            <text class="audition-title">已录片段即刻回放</text>
+          </view>
+          <text class="audition-dur-pill">{{pausedDurationText || elapsedText}}</text>
+        </view>
+
+        <view class="paused-player-body">
+          <view class="paused-play-btn {{pausedIsPlaying ? 'playing' : ''}}" bindtap="onTogglePausedPreview" hover-class="btn-hover">
+            <text class="paused-play-icon">{{pausedIsPlaying ? '⏸' : '▶'}}</text>
+          </view>
+          <view class="paused-slider-column">
+            <slider
+              class="paused-slider"
+              min="0"
+              max="{{pausedDuration || 1}}"
+              value="{{pausedSliderValue}}"
+              step="0.1"
+              block-size="14"
+              activeColor="#FF6B00"
+              backgroundColor="#EAE6DF"
+              bindchange="onPausedPreviewSeek"
+            />
+            <view class="paused-time-meta">
+              <text>{{pausedCurrentText}}</text>
+              <text>{{pausedDurationText || elapsedText}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 声波定格预览 -->
+      <view class="live-wave-stage frozen">
+        <view class="live-wave-spectrum">
+          <view
+            wx:for="{{liveWaveBars}}"
+            wx:key="id"
+            class="live-spectrum-bar frozen"
+            style="height: {{item.height}}rpx; opacity: 0.45;"
+          ></view>
+        </view>
+        <view class="live-wave-baseline"></view>
+      </view>
+
+      <view class="control-row paused-actions">
+        <view class="ctrl-btn ghost accent" bindtap="onResumeRecord" hover-class="btn-hover">
+          <text class="ctrl-icon">▶</text>
+          <text>继续录音</text>
+        </view>
+        <view class="ctrl-btn finish" bindtap="onFinishRecord" hover-class="btn-hover">
+          <text class="ctrl-icon">✓</text>
+          <text>完成录音</text>
+        </view>
+      </view>
+
+      <view class="paused-discard-link" bindtap="onRestartRecord">放弃此段并重录</view>
     </view>
 
     <!-- REVIEW：试听 + 去向 -->
@@ -88,7 +178,7 @@
         <view class="file-emoji">🎧</view>
         <view class="file-meta">
           <text class="file-name">{{fileName}}</text>
-          <text class="file-spec">{{durationText}} · {{sizeText}} · MP3 立体声</text>
+          <text class="file-spec">{{durationText}} · {{sizeText}} · 高保真原声</text>
         </view>
       </view>
 
