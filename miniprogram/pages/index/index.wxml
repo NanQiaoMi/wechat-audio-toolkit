@@ -28,6 +28,11 @@
 
   <!-- 2. 工具快捷区：剪辑 / 录音 / 作品库 -->
   <view class="quick-tools-row">
+    <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goVideoExtract">
+      <text class="qt-icon">🎬</text>
+      <text class="qt-title">视频提取</text>
+      <text class="qt-sub">秒抽音轨</text>
+    </view>
     <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goEditor">
       <text class="qt-icon">✂️</text>
       <text class="qt-title">音乐剪辑</text>
@@ -36,12 +41,12 @@
     <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goRecord">
       <text class="qt-icon">🎙</text>
       <text class="qt-title">现场录音</text>
-      <text class="qt-sub">录完即转</text>
+      <text class="qt-sub">声波试听</text>
     </view>
     <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goLibrary">
       <text class="qt-icon">📚</text>
       <text class="qt-title">我的作品</text>
-      <text class="qt-sub">历史与导出</text>
+      <text class="qt-sub">历史导出</text>
     </view>
   </view>
 

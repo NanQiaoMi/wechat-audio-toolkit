@@ -131,7 +131,7 @@ Page({
     this.setData({
       sourceFile: {
         path: pending.path,
-        name: pending.name || '现场录音.mp3',
+        name: pending.name || (pending.from === 'video-extract' ? '视频提取原声.m4a' : '现场录音.mp3'),
         size: size,
         sizeText: formatBytes(size),
         extName: extName,
@@ -153,7 +153,8 @@ Page({
     if (sourcePlayable && this.sourceAudioCtx) {
       try { this.sourceAudioCtx.src = pending.path; } catch (e) {}
     }
-    wx.showToast({ title: '录音已就绪', icon: 'none' });
+    const toastTitle = pending.from === 'video-extract' ? '视频原声已就绪' : '录音已就绪';
+    wx.showToast({ title: toastTitle, icon: 'none' });
   },
 
   /** 刷新右上角作品库角标 */
@@ -929,6 +930,14 @@ Page({
           },
         });
       },
+    });
+  },
+
+  goVideoExtract() {
+    this.stopAllAudio();
+    wx.navigateTo({
+      url: '/pages/video-extract/video-extract?from=index',
+      fail: () => wx.showToast({ title: '无法打开视频提取', icon: 'none' }),
     });
   },
 

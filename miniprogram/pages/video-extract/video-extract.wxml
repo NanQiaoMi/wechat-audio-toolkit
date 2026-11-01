@@ -1,0 +1,185 @@
+<!-- miniprogram/pages/video-extract/video-extract.wxml -->
+<view class="container">
+  
+  <!-- 1. 顶部极简品牌条 -->
+  <view class="page-topbar">
+    <view class="topbar-title-group">
+      <text class="topbar-main">🎬 视频提取音频</text>
+      <text class="topbar-sub">支持相册短视频 / 微信聊天视频 · 毫秒级极速剥离</text>
+    </view>
+    <view class="topbar-actions">
+      <view class="topbar-pill-btn" bindtap="goLibrary">
+        <text class="topbar-pill-icon">📚</text>
+        <text>我的作品</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 2. 空态/未选视频状态 (Hero Card) -->
+  <view wx:if="{{status === 'idle'}}" class="card-panel hero-picker-card">
+    <view class="picker-dropzone">
+      <view class="picker-clapperboard-icon">
+        <view class="clapperboard-top"></view>
+        <view class="clapperboard-sparkle">🎬</view>
+      </view>
+
+      <text class="picker-main-title">选取视频，提取无损原声音频</text>
+      <text class="picker-sub-title">优先调用本地硬件解封装，1秒提取，节省97%流量</text>
+
+      <view class="picker-actions-column">
+        <button class="primary-picker-btn" bindtap="chooseAlbumVideo" hover-class="picker-btn-hover">
+          <text class="picker-btn-icon">📱</text>
+          <text class="picker-btn-label">从手机相册选取视频</text>
+        </button>
+        <button class="secondary-picker-btn" bindtap="chooseMessageVideo" hover-class="picker-btn-hover">
+          <text class="picker-btn-icon">💬</text>
+          <text class="picker-btn-label">从微信聊天会话选取</text>
+        </button>
+      </view>
+
+      <view class="picker-spec-capsule">
+        <text>支持 MP4 / MOV 格式 · 单个视频 ≤ 100MB · 最长建议 30 分钟</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 3. 正在提取状态 (Progress Card) -->
+  <view wx:elif="{{status === 'extracting'}}" class="card-panel extracting-card">
+    <view class="extract-anim-box">
+      <view class="extract-pulse-ring ring-1"></view>
+      <view class="extract-pulse-ring ring-2"></view>
+      <view class="extract-center-icon">⚡</view>
+    </view>
+
+    <text class="extract-status-title">{{extractTitle}}</text>
+    <text class="extract-status-sub">{{extractSubTip}}</text>
+
+    <view class="source-video-preview-pill">
+      <text class="src-vid-name">{{videoInfo.name}}</text>
+      <text class="src-vid-meta">{{videoInfo.sizeText}} · {{videoInfo.durationText}}</text>
+    </view>
+
+    <view class="extract-mode-badge {{isCloudProcessing ? 'cloud' : 'local'}}">
+      <text>{{isCloudProcessing ? '☁️ 云端高精度转码抽取中…' : '⚡ 本地芯片级容器解复用中…'}}</text>
+    </view>
+  </view>
+
+  <!-- 4. 提取成功结果卡片 (Success Card) -->
+  <view wx:elif="{{status === 'success'}}" class="card-panel result-card">
+    
+    <!-- 头部成功指示器 -->
+    <view class="result-status-header">
+      <view class="result-check-badge">✓</view>
+      <view class="result-title-group">
+        <text class="result-headline">音频提取成功</text>
+        <text class="result-speed-tag">耗时 {{extractCostMs}}ms · {{extractMode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'}}</text>
+      </view>
+      <view class="repick-btn" bindtap="resetToPicker" hover-class="btn-hover">
+        <text>重选</text>
+      </view>
+    </view>
+
+    <!-- 视频与提取音频元数据展示 -->
+    <view class="extracted-meta-card">
+      <image wx:if="{{videoInfo.thumbTempFilePath}}" class="video-thumb" src="{{videoInfo.thumbTempFilePath}}" mode="aspectFill"></image>
+      <view wx:else class="video-thumb-placeholder">🎬</view>
+      
+      <view class="extracted-text-group">
+        <text class="extracted-audio-name">{{resultAudio.title}}</text>
+        <view class="extracted-tags-row">
+          <text class="tag-capsule format">{{resultAudio.formatUpper}}</text>
+          <text class="tag-capsule dur">{{resultAudio.durationText}}</text>
+          <text class="tag-capsule size">{{resultAudio.sizeText}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 即时原声高保真试听器 (Audition Player) -->
+    <view class="audition-player-panel">
+      <view class="player-controls-row">
+        <!-- 播放/暂停胶囊按键 -->
+        <view class="player-toggle-btn {{isPlaying ? 'playing' : ''}}" bindtap="togglePlayAudio" hover-class="player-btn-hover">
+          <text class="player-btn-glyph">{{isPlaying ? '⏸' : '▶'}}</text>
+        </view>
+
+        <!-- 寻位滑条与起止时间 -->
+        <view class="player-seek-wrapper">
+          <view class="player-time-row">
+            <text class="player-time-current">{{playCurrentTimeText}}</text>
+            <text class="player-time-total">{{resultAudio.durationText}}</text>
+          </view>
+          <slider
+            class="player-slider"
+            min="0"
+            max="{{sliderMax}}"
+            value="{{sliderValue}}"
+            backgroundColor="#E5E5E5"
+            activeColor="#FF6B00"
+            block-size="16"
+            block-color="#FF6B00"
+            bindchanging="onSliderChanging"
+            bindchange="onSliderChange"
+          />
+        </view>
+      </view>
+    </view>
+
+    <!-- 核心四大去向操作网格 -->
+    <view class="next-actions-grid">
+      <!-- 送入多轨剪辑 -->
+      <view class="action-card primary" bindtap="sendToEditor" hover-class="action-card-hover">
+        <view class="action-icon-box">✂️</view>
+        <view class="action-info">
+          <text class="action-name">送入多轨剪辑</text>
+          <text class="action-desc">挂载到音轨 · 裁剪变速对齐</text>
+        </view>
+        <text class="action-arrow">➔</text>
+      </view>
+
+      <!-- 送入格式转换/压缩 -->
+      <view class="action-card secondary" bindtap="sendToConverter" hover-class="action-card-hover">
+        <view class="action-icon-box">⚡</view>
+        <view class="action-info">
+          <text class="action-name">转格式 / 压缩</text>
+          <text class="action-desc">转 MP3/WAV · 高保真压缩</text>
+        </view>
+        <text class="action-arrow">➔</text>
+      </view>
+
+      <!-- 存入我的作品 -->
+      <view class="action-card tertiary" bindtap="saveToMyLibrary" hover-class="action-card-hover">
+        <view class="action-icon-box">📚</view>
+        <view class="action-info">
+          <text class="action-name">{{isSavedToLibrary ? '已存入我的作品' : '存入我的作品'}}</text>
+          <text class="action-desc">云端保存 · 随时导出分享</text>
+        </view>
+        <text class="action-badge-state">{{isSavedToLibrary ? '已存' : '+'}}</text>
+      </view>
+
+      <!-- 分享或保存 -->
+      <view class="action-card quaternary" bindtap="shareOrSaveAudio" hover-class="action-card-hover">
+        <view class="action-icon-box">📤</view>
+        <view class="action-info">
+          <text class="action-name">发送 / 导出</text>
+          <text class="action-desc">分享好友或保存到手机</text>
+        </view>
+        <text class="action-arrow">➔</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 5. 错误提示卡片 (Error Card) -->
+  <view wx:elif="{{status === 'error'}}" class="card-panel error-card">
+    <view class="error-icon-box">⚠️</view>
+    <text class="error-main-msg">音频提取遇到问题</text>
+    <text class="error-detail-msg">{{errorMessage}}</text>
+    <view class="error-actions-row">
+      <button class="pill-btn primary" bindtap="resetToPicker">重新选择视频</button>
+    </view>
+  </view>
+
+  <!-- 6. 底部技术说明 -->
+  <view class="page-footer">
+    <text class="footer-tip">💡 提示：短视频背景音乐、电影原声、语音讲解均可高保真秒级剥离</text>
+  </view>
+</view>
