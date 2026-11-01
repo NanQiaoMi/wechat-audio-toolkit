@@ -271,6 +271,7 @@ test('record.js: 模块定义与基础数据结构存在', () => {
     assert.strictEqual(pageOptions.data.status, 'idle');
     assert.strictEqual(pageOptions.data.liveWaveBars.length, 28);
   } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
     global.wx = originalWx;
     global.Page = originalPage;
   }
@@ -309,6 +310,7 @@ test('record.js: 实时帧声波更新与 28 柱动态谱线响应', () => {
     const lastBar = pageInstance.data.liveWaveBars[27];
     assert(lastBar.height > 20, '波形条高度未跟随振幅更新');
   } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
     global.wx = originalWx;
     global.Page = originalPage;
   }
@@ -358,6 +360,7 @@ test('record.js: 随时暂停/中断即时回放与恢复', () => {
     assert.strictEqual(pageInstance.data.status, 'recording');
     assert.strictEqual(pageInstance.data.pausedIsPlaying, false);
   } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
     global.wx = originalWx;
     global.Page = originalPage;
   }
@@ -400,6 +403,7 @@ test('record.js: 系统通话打断中断保存与最终 WAV 合成', () => {
     assert(pageInstance.data.fileName.endsWith('.wav'), '生成文件名应为 .wav');
     assert(pageInstance.data.tempFilePath.endsWith('.wav'), '输出路径应为 .wav');
   } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
     global.wx = originalWx;
     global.Page = originalPage;
   }
@@ -422,9 +426,11 @@ test('library.js: 模块定义、加载与类型筛选切换', () => {
     assert.strictEqual(typeof pageOptions.clearAll, 'function');
     assert.strictEqual(typeof pageOptions.shareItem, 'function');
   } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
     global.wx = originalWx;
     global.Page = originalPage;
   }
 });
 
 console.log(`\n============================================\n录音与作品库单测: pass=${passCount} fail=0\n全部通过 ✅\n`);
+process.exit(0);

@@ -642,7 +642,7 @@ async function extractVideoAudio(event) {
     const dl = await cloud.downloadFile({ fileID })
     const buf = Buffer.isBuffer(dl.fileContent) ? dl.fileContent : Buffer.from(dl.fileContent)
     if (!buf || buf.length === 0) throw new Error('视频源文件为空或下载失败')
-    if (buf.length > 100 * 1024 * 1024) throw new Error('视频超过 100MB 限制，请选取更小的视频')
+    if (buf.length > 500 * 1024 * 1024) throw new Error('视频超过 500MB 限制，请选取更小的视频')
     fs.writeFileSync(inputPath, buf)
 
     const duration = await getDuration(inputPath)
