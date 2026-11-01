@@ -63,16 +63,23 @@ async function runAll() {
     assert.strictEqual(videoExtractor.formatBytes(1.2 * 1024 * 1024 * 1024), '1.20 GB');
   });
 
-  it('validateVideoFile: 正常视频、空文件、超 100MB、超 30 分钟拦截', () => {
+  it('validateVideoFile: 正常视频、大视频(350MB放行)、超 500MB拦截、超 30 分钟拦截', () => {
     const emptyCheck = videoExtractor.validateVideoFile(null);
     assert.strictEqual(emptyCheck.valid, false);
 
     const zeroSize = videoExtractor.validateVideoFile({ size: 0, duration: 10 });
     assert.strictEqual(zeroSize.valid, false);
 
-    const overSize = videoExtractor.validateVideoFile({ size: 105 * 1024 * 1024, duration: 60 });
+    // 350MB 大视频应正常放行并标记 isLarge = true
+    const largeFile = videoExtractor.validateVideoFile({ size: 350 * 1024 * 1024, duration: 180 });
+    assert.strictEqual(largeFile.valid, true);
+    assert.strictEqual(largeFile.isLarge, true);
+    assert.ok(largeFile.largeNotice.indexOf('较大') >= 0);
+
+    // 超过 500MB 拦截
+    const overSize = videoExtractor.validateVideoFile({ size: 520 * 1024 * 1024, duration: 60 });
     assert.strictEqual(overSize.valid, false);
-    assert.ok(overSize.error.indexOf('100MB') >= 0);
+    assert.ok(overSize.error.indexOf('500MB') >= 0);
 
     const overDuration = videoExtractor.validateVideoFile({ size: 20 * 1024 * 1024, duration: 1900 });
     assert.strictEqual(overDuration.valid, false);
@@ -81,6 +88,7 @@ async function runAll() {
     const validFile = videoExtractor.validateVideoFile({ size: 15 * 1024 * 1024, duration: 120, name: 'my_video.mp4' });
     assert.strictEqual(validFile.valid, true);
     assert.strictEqual(validFile.name, 'my_video.mp4');
+    assert.strictEqual(validFile.isLarge, false);
   });
 
   it('buildLibraryItem: 构造符合 library-store 规范的条目', () => {

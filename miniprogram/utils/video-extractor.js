@@ -7,8 +7,10 @@
  * 3. 结果统一支持：原声高保真试听、一键送入多轨剪辑工坊、格式转换/压缩、存入我的作品库。
  */
 
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB 限制
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500MB 限制 (放宽至 500MB，覆盖 95%+ 手机高清拍摄)
+const LARGE_VIDEO_THRESHOLD_BYTES = 300 * 1024 * 1024; // 300MB 以上大文件友好提醒
 const MAX_VIDEO_DURATION_SEC = 1800; // 最长建议 30 分钟
+const MAX_CLOUD_VIDEO_BYTES = 100 * 1024 * 1024; // 云端兜底由于 60s 超时仍保持 100MB 限制
 
 /**
  * 格式化秒数为 mm:ss 或 hh:mm:ss
@@ -43,7 +45,7 @@ function formatBytes(bytes) {
 /**
  * 校验待提取的视频文件元数据
  * @param {Object} file 视频文件对象 (from wx.chooseMedia / wx.chooseMessageFile)
- * @returns {{ valid: boolean, error?: string, size: number, duration: number, name: string }}
+ * @returns {{ valid: boolean, error?: string, size: number, duration: number, name: string, isLarge?: boolean, largeNotice?: string }}
  */
 function validateVideoFile(file) {
   if (!file) {
@@ -61,7 +63,7 @@ function validateVideoFile(file) {
   if (size > MAX_VIDEO_BYTES) {
     return {
       valid: false,
-      error: `视频大小为 ${formatBytes(size)}，超过 100MB 限制。请选取更短或更小的视频。`,
+      error: `视频大小为 ${formatBytes(size)}，超过 500MB 限制。超大视频在手机端极易因内存不足闪退，建议先进行片段截取或压缩后再提取。`,
       size,
       duration,
       name,
@@ -78,7 +80,12 @@ function validateVideoFile(file) {
     };
   }
 
-  return { valid: true, size, duration, name };
+  const isLarge = size >= LARGE_VIDEO_THRESHOLD_BYTES;
+  const largeNotice = isLarge
+    ? `视频文件较大（${formatBytes(size)}），正在为您芯片级抽取纯音轨…`
+    : '';
+
+  return { valid: true, size, duration, name, isLarge, largeNotice };
 }
 
 /**
@@ -333,6 +340,8 @@ function buildLibraryItem({
 
 module.exports = {
   MAX_VIDEO_BYTES,
+  LARGE_VIDEO_THRESHOLD_BYTES,
+  MAX_CLOUD_VIDEO_BYTES,
   MAX_VIDEO_DURATION_SEC,
   formatSeconds,
   formatBytes,

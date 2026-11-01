@@ -207,7 +207,7 @@ Page({
       status: 'extracting',
       isCloudProcessing: false,
       extractTitle: '正在从视频中无损剥离音轨…',
-      extractSubTip: '本地硬件解封装中，毫秒级出声',
+      extractSubTip: check.largeNotice || '本地硬件解封装中，毫秒级出声',
       videoInfo: {
         name: rawFile.name || '未命名视频.mp4',
         size: rawFile.size,
@@ -244,6 +244,15 @@ Page({
     }
 
     // ---- 策略 2：优雅降级至云端 FFmpeg 强力抽取 ----
+    // 云端因 60s 超时限制，单个视频上限为 100MB
+    if (rawFile.size > videoExtractor.MAX_CLOUD_VIDEO_BYTES) {
+      this.setData({
+        status: 'error',
+        errorMessage: `该视频编码较特殊，手机本地无法直接解封装；且大小为 ${videoExtractor.formatBytes(rawFile.size)}（超过云端 60 秒超时 100MB 限额）。建议先将视频保存为标准 MP4 格式或裁剪后再提取。`,
+      });
+      return;
+    }
+
     this.setData({
       isCloudProcessing: true,
       extractTitle: '本地解封装未命中，正在上传云端抽取…',
