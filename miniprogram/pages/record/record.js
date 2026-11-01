@@ -1,29 +1,33 @@
 // miniprogram/pages/record/record.js
 /**
- * 现场录音页（v5.1 · FR-30）
+ * 现场录音页（v5.2 · 实时波形与随时中断回放深度优化）
  * 计划：docs/NEXT_UPDATE_PLAN.md §5.1 / §5.7
  *
- * 状态机：idle（待录） → recording（录音中） ⇄ paused（暂停） → review（试听 / 去向）
+ * 状态机：idle（待录） → recording（录音中） ⇄ paused（暂停/中断） → review（试听 / 去向）
  * 去向：写入 app.globalData.pendingAudio（一次性跨页数据，严禁 URL 传路径）
  *   - 去转换：navigateBack 回首页（栈深 <= 1 时 reLaunch 首页）
  *   - 去剪辑：redirectTo 编辑器 ?from=record
  */
 
-// ---- 录音参数契约（计划 §5.1.3，勿随意调整）----
+const recordAudio = require('../../utils/record-audio.js');
+
+// ---- 录音参数契约（原生 PCM 实时流采集，支持 100% 真实物理声波计算）----
 const RECORD_OPTIONS = {
   duration: 600000, // 10 分钟上限（毫秒）
-  sampleRate: 44100,
-  numberOfChannels: 2,
-  encodeBitRate: 192000,
-  format: 'mp3',
+  sampleRate: 16000, // 16kHz 高保真语音采样
+  numberOfChannels: 1, // 单声道
+  encodeBitRate: 48000,
+  format: 'pcm', // 关键：原生 16-bit PCM 二进制帧回调
+  frameSize: 2, // 2KB 帧大小（约 62.5ms 一帧回调，保障 16~20 FPS 丝滑实时波形）
 };
 
 const MAX_DURATION_MS = 600000;
 const MIN_DURATION_MS = 1000; // 不足 1 秒拒绝（计划 §5.1.6）
 const TIMER_INTERVAL_MS = 100;
 const HIT_LIMIT_TOLERANCE_MS = 1500; // 自动停止判定容差
+const LIVE_BAR_COUNT = 28;
 
-// 假声波动效条（同计划 §5.1.3：CSS 假动效，不做真实波形）
+// 假声波动效条（做降级容错备用）
 const WAVE_BARS = [];
 for (let i = 0; i < 14; i++) {
   WAVE_BARS.push({
@@ -60,9 +64,10 @@ function formatBytes(bytes) {
   return mb.toFixed(mb < 10 ? 1 : 0) + ' MB';
 }
 
-// 录音文件展示名：录音_YYYYMMDD_HHmmss.mp3（计划 §5.1.3）
-function buildRecordName(date) {
+// 录音文件展示名：录音_YYYYMMDD_HHmmss.wav（计划 §5.1.3）
+function buildRecordName(date, ext) {
   const d = date || new Date();
+  const fileExt = ext || 'wav';
   return (
     '录音_' +
     d.getFullYear() +
@@ -72,7 +77,8 @@ function buildRecordName(date) {
     pad2(d.getHours()) +
     pad2(d.getMinutes()) +
     pad2(d.getSeconds()) +
-    '.mp3'
+    '.' +
+    fileExt
   );
 }
 
@@ -103,6 +109,22 @@ Page({
     elapsedText: '00:00',
     waveBars: WAVE_BARS,
     interrupted: false,
+
+    // 实时真实物理波形谱线（28 柱动态响应）
+    liveWaveBars: recordAudio.initWaveBars(LIVE_BAR_COUNT),
+    liveDecibel: -60,
+    liveDecibelText: '-60 dB',
+    liveDecibelStatus: '环境安静',
+    liveDecibelLevel: 'quiet', // 'quiet' | 'normal' | 'good' | 'loud' | 'peak'
+
+    // 中断即时回放（Audition While Paused / Interrupted）
+    pausedPreviewReady: false,
+    pausedIsPlaying: false,
+    pausedDuration: 0,
+    pausedDurationText: '00:00',
+    pausedCurrentTime: 0,
+    pausedCurrentText: '00:00',
+    pausedSliderValue: 0,
 
     // 异常态（权限 / 隐私 / 录音失败）
     errorKind: '', // '' | 'auth' | 'privacy' | 'failed'
@@ -208,12 +230,14 @@ Page({
       error: (err) => this.handleRecorderError(err),
       interruptionBegin: () => this.handleAudioInterruptionBegin(),
       interruptionEnd: () => this.handleAudioInterruptionEnd(),
+      frame: (res) => this.handleFrameRecorded(res),
     };
 
     const h = this.recorderHandlers;
     recorder.onStart(h.start);
     recorder.onStop(h.stop);
     recorder.onError(h.error);
+    if (recorder.onFrameRecorded) recorder.onFrameRecorded(h.frame);
     if (recorder.onInterruptionBegin) recorder.onInterruptionBegin(h.interruptionBegin);
     if (recorder.onInterruptionEnd) recorder.onInterruptionEnd(h.interruptionEnd);
 
@@ -232,6 +256,7 @@ Page({
         if (recorder.offStart) recorder.offStart(h.start);
         if (recorder.offStop) recorder.offStop(h.stop);
         if (recorder.offError) recorder.offError(h.error);
+        if (recorder.offFrameRecorded) recorder.offFrameRecorded(h.frame);
         if (recorder.offInterruptionBegin) recorder.offInterruptionBegin(h.interruptionBegin);
         if (recorder.offInterruptionEnd) recorder.offInterruptionEnd(h.interruptionEnd);
       } catch (e) {}
@@ -316,11 +341,20 @@ Page({
   destroyPreview() {
     const ctx = this.audioCtx;
     this.audioCtx = null;
-    if (!ctx) return;
-    try {
-      ctx.stop();
-      if (ctx.destroy) ctx.destroy();
-    } catch (e) {}
+    if (ctx) {
+      try {
+        ctx.stop();
+        if (ctx.destroy) ctx.destroy();
+      } catch (e) {}
+    }
+    const pCtx = this.pausedAudioCtx;
+    this.pausedAudioCtx = null;
+    if (pCtx) {
+      try {
+        pCtx.stop();
+        if (pCtx.destroy) pCtx.destroy();
+      } catch (e) {}
+    }
   },
 
   // ============================================================
@@ -489,7 +523,20 @@ Page({
     if (this.data.status !== 'idle' || this.starting) return;
     this.starting = true;
     this.stopping = false;
-    this.setData({ interrupted: false });
+    this.pcmChunks = [];
+    this.pcmTotalBytes = 0;
+    this._lastWaveRender = 0;
+    this.pausedTempPath = '';
+    this.setData({
+      interrupted: false,
+      pausedPreviewReady: false,
+      pausedIsPlaying: false,
+      liveWaveBars: recordAudio.initWaveBars(LIVE_BAR_COUNT),
+      liveDecibel: -60,
+      liveDecibelText: '-60 dB',
+      liveDecibelStatus: '环境安静',
+      liveDecibelLevel: 'quiet',
+    });
     try {
       this.recorder.start(RECORD_OPTIONS);
     } catch (e) {
@@ -521,6 +568,39 @@ Page({
     }
   },
 
+  /**
+   * 录音实时帧数据监听（核心算法：真实物理声波计算）
+   */
+  handleFrameRecorded(res) {
+    if (this.destroyed || !res || !res.frameBuffer) return;
+    const buf = res.frameBuffer;
+    if (!this.pcmChunks) this.pcmChunks = [];
+    this.pcmChunks.push(buf);
+    this.pcmTotalBytes = (this.pcmTotalBytes || 0) + buf.byteLength;
+
+    // 1. 计算当前帧真实物理 RMS 能量与分贝
+    const rms = recordAudio.computePcmRms(buf);
+    const db = recordAudio.rmsToDb(rms);
+    const dbInfo = recordAudio.formatDecibelStatus(db);
+
+    // 2. 推进 28 柱实时滚动声波谱线
+    const currentBars = this.data.liveWaveBars || recordAudio.initWaveBars(LIVE_BAR_COUNT);
+    const nextBars = recordAudio.pushWaveBar(currentBars, rms, 110, 8);
+
+    // 3. 节流渲染（~55ms 刷新一次，约 18 FPS，保证 60FPS UI 不卡顿且波形丝滑）
+    const now = Date.now();
+    if (!this._lastWaveRender || now - this._lastWaveRender >= 55) {
+      this._lastWaveRender = now;
+      this.setData({
+        liveWaveBars: nextBars,
+        liveDecibel: db,
+        liveDecibelText: dbInfo.text,
+        liveDecibelStatus: dbInfo.status,
+        liveDecibelLevel: dbInfo.level,
+      });
+    }
+  },
+
   onPauseRecord() {
     this.pauseRecording();
   },
@@ -534,6 +614,105 @@ Page({
         this.recorder.pause();
       } catch (e) {}
     }
+    // 随时中断能够完成回放：立即合成当前已录音频并就绪试听播放器
+    this.preparePausedPreview();
+  },
+
+  /**
+   * 暂停/中断时即刻合成已录音频，构建随时可回放播放器
+   */
+  preparePausedPreview() {
+    if (!this.pcmChunks || this.pcmChunks.length === 0) {
+      this.setData({ pausedPreviewReady: false });
+      return;
+    }
+    try {
+      const fullPcm = recordAudio.concatChunks(this.pcmChunks);
+      const durSec = fullPcm.byteLength / (16000 * 2);
+      if (durSec < 0.2) {
+        this.setData({ pausedPreviewReady: false });
+        return;
+      }
+      const wavBuffer = recordAudio.pcmToWav(fullPcm, 16000, 1, 16);
+      let tempPath = '';
+      if (typeof wx !== 'undefined' && wx.getFileSystemManager && wx.env && wx.env.USER_DATA_PATH) {
+        const fs = wx.getFileSystemManager();
+        tempPath = `${wx.env.USER_DATA_PATH}/record_pause_preview_${Date.now()}.wav`;
+        fs.writeFileSync(tempPath, wavBuffer.buffer || wavBuffer);
+      }
+      this.pausedTempPath = tempPath;
+      this.initPausedAudioContext(tempPath, durSec);
+      this.setData({
+        pausedPreviewReady: true,
+        pausedDuration: Number(durSec.toFixed(1)),
+        pausedDurationText: formatSeconds(durSec),
+        pausedCurrentTime: 0,
+        pausedCurrentText: '00:00',
+        pausedSliderValue: 0,
+        pausedIsPlaying: false,
+      });
+    } catch (err) {
+      console.warn('准备中断回放失败', err);
+      this.setData({ pausedPreviewReady: false });
+    }
+  },
+
+  initPausedAudioContext(src, durSec) {
+    if (!this.pausedAudioCtx && typeof wx !== 'undefined' && wx.createInnerAudioContext) {
+      // 开启硬件静音键穿透
+      if (wx.setInnerAudioOption) {
+        try { wx.setInnerAudioOption({ obeyMuteSwitch: false }); } catch (e) {}
+      }
+      const ctx = wx.createInnerAudioContext();
+      try { ctx.obeyMuteSwitch = false; } catch (e) {}
+      ctx.onPlay(() => this.setData({ pausedIsPlaying: true }));
+      ctx.onPause(() => this.setData({ pausedIsPlaying: false }));
+      ctx.onStop(() => this.setData({ pausedIsPlaying: false, pausedCurrentTime: 0, pausedSliderValue: 0, pausedCurrentText: '00:00' }));
+      ctx.onEnded(() => this.setData({ pausedIsPlaying: false, pausedCurrentTime: 0, pausedSliderValue: 0, pausedCurrentText: '00:00' }));
+      ctx.onTimeUpdate(() => {
+        if (this.data.status !== 'paused' || !this.pausedAudioCtx) return;
+        const cur = Number(this.pausedAudioCtx.currentTime) || 0;
+        this.setData({
+          pausedCurrentTime: cur,
+          pausedSliderValue: cur,
+          pausedCurrentText: formatSeconds(cur),
+        });
+      });
+      ctx.onError(() => this.setData({ pausedIsPlaying: false }));
+      this.pausedAudioCtx = ctx;
+    }
+    if (this.pausedAudioCtx && src) {
+      try {
+        this.pausedAudioCtx.stop();
+        this.pausedAudioCtx.src = src;
+      } catch (e) {}
+    }
+  },
+
+  onTogglePausedPreview() {
+    if (this.data.status !== 'paused' || !this.pausedAudioCtx) return;
+    if (this.data.pausedIsPlaying) {
+      try { this.pausedAudioCtx.pause(); } catch (e) {}
+      this.setData({ pausedIsPlaying: false });
+    } else {
+      if (!this.pausedAudioCtx.src && this.pausedTempPath) {
+        try { this.pausedAudioCtx.src = this.pausedTempPath; } catch (e) {}
+      }
+      try { this.pausedAudioCtx.play(); } catch (e) {}
+    }
+  },
+
+  onPausedPreviewSeek(e) {
+    if (this.data.status !== 'paused' || !this.pausedAudioCtx) return;
+    const detail = (e && e.detail) || {};
+    const val = Number(detail.value);
+    if (isNaN(val)) return;
+    try { this.pausedAudioCtx.seek(val); } catch (e) {}
+    this.setData({
+      pausedCurrentTime: val,
+      pausedSliderValue: val,
+      pausedCurrentText: formatSeconds(val),
+    });
   },
 
   onResumeRecord() {
@@ -542,6 +721,13 @@ Page({
 
   resumeRecording() {
     if (this.data.status !== 'paused') return;
+    // 恢复录音前停止中断回放音频
+    if (this.pausedAudioCtx) {
+      try { this.pausedAudioCtx.stop(); } catch (e) {}
+    }
+    this.setData({
+      pausedIsPlaying: false,
+    });
     if (!this.recorder) {
       this.showError('failed', '录音不可用', '当前微信版本不支持录音功能，请升级微信后重试。');
       return;
@@ -560,6 +746,9 @@ Page({
     const status = this.data.status;
     if (status !== 'recording' && status !== 'paused') return;
     if (this.starting || this.stopping) return;
+    if (this.pausedAudioCtx) {
+      try { this.pausedAudioCtx.stop(); } catch (e) {}
+    }
     this.stopping = true;
     this.freezeTimer();
     this.clearTimer();
@@ -583,9 +772,27 @@ Page({
     if (this.destroyed) return;
 
     const info = res || {};
-    const path = info.tempFilePath || '';
-    const durationMs = Number(info.duration) || this.accMs || 0;
-    const fileSize = Number(info.fileSize) || 0;
+    let path = info.tempFilePath || '';
+    let durationMs = Number(info.duration) || this.accMs || 0;
+    let fileSize = Number(info.fileSize) || 0;
+
+    // 核心成果合成：如果有原生 PCM 帧切片，将其合成为标准 RIFF/WAVE 高保真音频
+    if (this.pcmChunks && this.pcmChunks.length > 0) {
+      try {
+        const fullPcm = recordAudio.concatChunks(this.pcmChunks);
+        const wavBuffer = recordAudio.pcmToWav(fullPcm, 16000, 1, 16);
+        if (typeof wx !== 'undefined' && wx.getFileSystemManager && wx.env && wx.env.USER_DATA_PATH) {
+          const fs = wx.getFileSystemManager();
+          const finalWavPath = `${wx.env.USER_DATA_PATH}/record_${Date.now()}.wav`;
+          fs.writeFileSync(finalWavPath, wavBuffer.buffer || wavBuffer);
+          path = finalWavPath;
+        }
+        fileSize = wavBuffer.byteLength;
+        durationMs = Math.round((fullPcm.byteLength / 32000) * 1000);
+      } catch (e) {
+        console.warn('WAV合成失败，回退使用原始路径', e);
+      }
+    }
 
     // 拿不到文件：兜底失败
     if (!path) {
@@ -603,7 +810,7 @@ Page({
 
     const hitLimit = durationMs >= MAX_DURATION_MS - HIT_LIMIT_TOLERANCE_MS;
     const durationSec = durationToSec(durationMs);
-    const fileName = buildRecordName(new Date());
+    const fileName = buildRecordName(new Date(), 'wav');
 
     this.setData({
       status: 'review',
