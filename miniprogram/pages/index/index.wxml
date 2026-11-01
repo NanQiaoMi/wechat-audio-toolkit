@@ -14,10 +14,10 @@
 
     <!-- 右侧胶囊快捷栏 (Apple Pill Style) -->
     <view class="top-capsule-bar">
-      <view class="capsule-btn" bindtap="openHistoryModal">
-        <text class="capsule-icon">🕒</text>
-        <text class="capsule-text">历史</text>
-        <text wx:if="{{historyList.length > 0}}" class="capsule-badge">{{historyList.length}}</text>
+      <view class="capsule-btn" bindtap="goLibrary">
+        <text class="capsule-icon">📚</text>
+        <text class="capsule-text">作品</text>
+        <text wx:if="{{libraryCount > 0}}" class="capsule-badge">{{libraryCount}}</text>
       </view>
       <view class="capsule-divider"></view>
       <view class="capsule-btn icon-only" bindtap="openSettings">
@@ -26,16 +26,23 @@
     </view>
   </view>
 
-  <!-- 2. 音频剪辑工坊快捷入口条 (优雅轻量横幅) -->
-  <view class="quick-tool-banner" bindtap="goEditor">
-    <view class="tool-banner-left">
-      <text class="tool-banner-icon">✂️</text>
-      <view class="tool-banner-text">
-        <text class="tool-banner-title">音乐剪辑工坊</text>
-        <text class="tool-banner-sub">精准裁剪 · 片段合并 · 淡入淡出 · 音量平衡</text>
-      </view>
+  <!-- 2. 工具快捷区：剪辑 / 录音 / 作品库 -->
+  <view class="quick-tools-row">
+    <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goEditor">
+      <text class="qt-icon">✂️</text>
+      <text class="qt-title">音乐剪辑</text>
+      <text class="qt-sub">多轨精剪</text>
     </view>
-    <view class="tool-banner-arrow">前往剪辑 ›</view>
+    <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goRecord">
+      <text class="qt-icon">🎙</text>
+      <text class="qt-title">现场录音</text>
+      <text class="qt-sub">录完即转</text>
+    </view>
+    <view class="quick-tool-card" hover-class="quick-tool-card-hover" bindtap="goLibrary">
+      <text class="qt-icon">📚</text>
+      <text class="qt-title">我的作品</text>
+      <text class="qt-sub">历史与导出</text>
+    </view>
   </view>
 
   <!-- 3. 主音频拾取 / 试听面板 (Hero Card) -->
@@ -457,53 +464,10 @@
   <!-- 7. 优雅轻量页脚信息 (Clean Editorial Footer) -->
   <view class="editorial-footer">
     <view class="footer-privacy-box">
-      <text class="footer-privacy-text">🔒 隐私承诺：所有临时音频文件仅用于本次转码，24小时后全自动物理销毁</text>
+      <text class="footer-privacy-text">🔒 隐私承诺：所有临时音频文件仅用于本次转码，24 小时内自动清理</text>
       <text class="footer-hint-text">💡 提示：转发至微信「文件传输助手」，可直接在聊天中长按保存至手机系统</text>
     </view>
-    <view wx:if="{{quotaUsed !== null}}" class="footer-quota-pill">
-      <text>今日免费额度：{{quotaUsed}} / 5 次</text>
-    </view>
     <text class="footer-copyright">AudioConvert · 极简 · 纯净 · 高保真</text>
-  </view>
-
-  <!-- 历史记录手作抽屉面板 (History Bottom Sheet) -->
-  <view wx:if="{{showHistoryModal}}" class="modal-backdrop" bindtap="closeHistoryModal">
-    <view class="modal-sheet-panel" catchtap="preventBubble">
-      <view class="sheet-drag-handle"></view>
-      
-      <view class="sheet-header">
-        <view class="sheet-title-group">
-          <text class="sheet-title">转换历史记录 ({{historyList.length}})</text>
-          <text class="sheet-sub">云端文件保留 24 小时，过期后请重新转换</text>
-        </view>
-        <view class="sheet-close-btn" bindtap="closeHistoryModal">✕</view>
-      </view>
-
-      <view wx:if="{{historyList.length === 0}}" class="sheet-empty-state">
-        <text class="empty-icon-emoji">📭</text>
-        <text class="empty-title">暂无转换历史</text>
-      </view>
-
-      <scroll-view wx:else scroll-y class="history-scroll-viewport">
-        <view wx:for="{{historyList}}" wx:key="id" class="history-row-card">
-          <view class="history-meta-info">
-            <text class="history-name-text">{{item.fileName}}</text>
-            <view class="history-tags-flow">
-              <text class="history-badge-format">{{item.sourceExt}} ➔ {{item.targetFormat}}</text>
-              <text class="history-badge-time">{{item.time}}</text>
-              <text class="history-badge-size">{{item.targetSizeText}}</text>
-            </view>
-          </view>
-          <view class="history-share-action-btn" bindtap="shareHistoryItem" data-item="{{item}}">
-            <text>分享</text>
-          </view>
-        </view>
-      </scroll-view>
-
-      <view wx:if="{{historyList.length > 0}}" class="sheet-footer-actions">
-        <view class="sheet-clear-btn" bindtap="clearHistory">清空历史记录</view>
-      </view>
-    </view>
   </view>
 
   <!-- 隐私保护授权卡片 (Privacy Modal) -->
@@ -512,7 +476,7 @@
       <view class="privacy-dialog-icon">🔐</view>
       <text class="privacy-dialog-title">用户隐私保护提示</text>
       <text class="privacy-dialog-content">
-        使用本音频转换服务前，请阅读并同意《隐私政策》。我们仅在你自主选择音频后上传处理，文件仅用于本次转码，并在 24 小时内彻底物理销毁；绝不用于任何其他商业用途。
+        使用本音频转换服务前，请阅读并同意《隐私政策》。我们仅在你自主选择音频后上传处理，文件仅用于本次转码，并在 24 小时内自动清理；绝不用于任何其他商业用途。
       </text>
       <view class="privacy-dialog-link" bindtap="openPrivacyContract">查看《隐私政策》</view>
       <view class="privacy-dialog-actions">

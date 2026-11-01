@@ -1,5 +1,6 @@
 // miniprogram/pages/index/index.js
 const app = getApp();
+const libraryStore = require('../../utils/library-store.js');
 
 // 与云函数保持一致：A 路线下各输出格式的保守时长上限（秒）
 const FORMAT_LIMIT_SEC = { mp3: 1200, wav: 1800, flac: 1800, m4a: 600, aac: 600, ogg: 600 };
@@ -91,13 +92,9 @@ Page({
     targetPlayable: true,
     targetPlayError: false,
 
-    // 历史记录
-    showHistoryModal: false,
-    quotaUsed: null,
-
-    // 隐私授权
+    // 作品库角标 / 隐私授权
+    libraryCount: 0,
     showPrivacy: false,
-    historyList: [],
   },
 
   sourceAudioCtx: null,
@@ -106,9 +103,74 @@ Page({
   onLoad() {
     this.historyTempPaths = Object.create(null);
     this.initAudioContexts();
-    this.loadHistory();
     this.initPrivacyAuthorization();
     this.updateCompressionEstimate();
+    if (wx.showShareMenu) {
+      try { wx.showShareMenu({ menus: ['shareAppMessage'] }); } catch (e) {}
+    }
+  },
+
+  onShow() {
+    this.consumePendingAudio();
+    this.refreshLibraryCount();
+  },
+
+  /** 消费「现场录音」页一次性传入的音频，填充为转换源 */
+  consumePendingAudio() {
+    let appInstance = null;
+    try { appInstance = getApp(); } catch (e) {}
+    const pending = appInstance && appInstance.globalData && appInstance.globalData.pendingAudio;
+    if (!pending || !pending.path) return;
+    appInstance.globalData.pendingAudio = null;
+    const extName = (pending.extName || 'MP3').toUpperCase();
+    const extLower = (pending.extLower || extName).toLowerCase();
+    const size = Number(pending.size) || 0;
+    const duration = Number(pending.durationSec) || 0;
+    const sourcePlayable = ['mp3', 'aac', 'm4a', 'wav'].indexOf(extLower) >= 0;
+    this.stopAllAudio();
+    this.setData({
+      sourceFile: {
+        path: pending.path,
+        name: pending.name || '现场录音.mp3',
+        size: size,
+        sizeText: formatBytes(size),
+        extName: extName,
+        extLower: extLower,
+      },
+      sourcePlayable: sourcePlayable,
+      status: 'IDLE',
+      statusText: '准备就绪',
+      convertResult: null,
+      resultTempFilePath: '',
+      targetPlayable: true,
+      targetPlayError: false,
+      sourceDuration: duration,
+      sourceDurationText: formatTime(duration),
+      sourceCurrentTime: 0,
+      sourceCurrentTimeText: '00:00',
+    });
+    this.updateCompressionEstimate();
+    if (sourcePlayable && this.sourceAudioCtx) {
+      try { this.sourceAudioCtx.src = pending.path; } catch (e) {}
+    }
+    wx.showToast({ title: '录音已就绪', icon: 'none' });
+  },
+
+  /** 刷新右上角作品库角标 */
+  refreshLibraryCount() {
+    try {
+      const lib = libraryStore.loadAndMigrate();
+      this.setData({ libraryCount: lib && lib.items ? lib.items.length : 0 });
+    } catch (e) {
+      this.setData({ libraryCount: 0 });
+    }
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '音频工具箱 · 格式转换 / 剪辑 / 录音，一站搞定',
+      path: '/pages/index/index',
+    };
   },
 
 
@@ -576,7 +638,6 @@ Page({
         targetPlayError: false,
         resultTempFilePath: '',
         filePreparing: true,
-        quotaUsed: transData.quota ? transData.quota.used : null,
         sourceDuration: transData.duration || this.data.sourceDuration,
         sourceDurationText: formatTime(transData.duration || this.data.sourceDuration),
         targetDuration: transData.duration || this.data.sourceDuration,
@@ -589,14 +650,16 @@ Page({
         this.targetAudioCtx.src = convertResult.downloadUrl;
       }
 
-      // 存入历史记录
+      // 存入作品库（v5.1：统一「我的作品」，旧 audio_convert_history 仅做迁移兼容）
       this.saveHistoryRecord({
         id: Date.now(),
         fileName: sourceFile.name,
         targetFileName: convertResult.fileName,
         sourceExt: sourceFile.extName,
         targetFormat: convertResult.targetFormat.toUpperCase(),
+        targetSize: convertResult.targetSize,
         targetSizeText: convertResult.targetSizeText,
+        duration: convertResult.duration,
         fileID: convertResult.fileID,
         downloadUrl: convertResult.downloadUrl,
         time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
@@ -800,33 +863,6 @@ Page({
   },
 
   /**
-   * 历史分享：先点一次准备文件，再点一次直接转发（shareFileMessage 需手势）
-   */
-  shareHistoryItem(e) {
-    const item = e.currentTarget.dataset.item;
-    if (!item || !item.fileID) return;
-    const cached = this.historyTempPaths && this.historyTempPaths[item.fileID];
-    if (cached) {
-      this.shareLocalFile(cached, item.targetFileName || item.fileName);
-      return;
-    }
-    wx.showToast({ title: '正在准备文件，请稍候再点', icon: 'none' });
-    wx.cloud.downloadFile({ fileID: item.fileID })
-      .then(res => {
-        if (!this.historyTempPaths) this.historyTempPaths = Object.create(null);
-        this.historyTempPaths[item.fileID] = res.tempFilePath;
-        wx.showToast({ title: '文件已准备，请再次点击分享', icon: 'none' });
-      })
-      .catch(() => {
-        wx.showModal({
-          title: '文件已过期',
-          content: '云端文件仅保留 24 小时，历史记录中的文件可能已被清理。\n请重新转换后再分享。',
-          showCancel: false,
-        });
-      });
-  },
-
-  /**
    * 复制临时下载外链
    */
   copyDownloadLink() {
@@ -864,23 +900,15 @@ Page({
   },
 
   /**
-   * 历史记录管理
+   * 保存转换作品到「我的作品」库
    */
-  loadHistory() {
-    try {
-      const history = wx.getStorageSync('audio_convert_history') || [];
-      this.setData({ historyList: history });
-    } catch (e) {}
-  },
-
   saveHistoryRecord(record) {
     try {
-      let list = wx.getStorageSync('audio_convert_history') || [];
-      list.unshift(record);
-      if (list.length > 20) list = list.slice(0, 20); // 最多保留 20 条
-      wx.setStorageSync('audio_convert_history', list);
-      this.setData({ historyList: list });
-    } catch (e) {}
+      libraryStore.addToLibrary(libraryStore.itemFromConvert(record));
+      this.refreshLibraryCount();
+    } catch (e) {
+      console.warn('保存作品库失败', e);
+    }
   },
 
   openSettings() {
@@ -904,30 +932,20 @@ Page({
     });
   },
 
-  openHistoryModal() {
-    this.loadHistory();
-    this.setData({ showHistoryModal: true });
+  goRecord() {
+    this.stopAllAudio();
+    wx.navigateTo({ url: '/pages/record/record?from=index' });
   },
 
-  closeHistoryModal() {
-    this.setData({ showHistoryModal: false });
+  goLibrary() {
+    this.stopAllAudio();
+    wx.navigateTo({
+      url: '/pages/library/library',
+      fail: () => wx.showToast({ title: '无法打开作品库', icon: 'none' }),
+    });
   },
 
   preventBubble() {},
-
-  clearHistory() {
-    wx.showModal({
-      title: '清空确认',
-      content: '确定要清空所有转换历史记录吗？',
-      success: res => {
-        if (res.confirm) {
-          wx.removeStorageSync('audio_convert_history');
-          this.setData({ historyList: [] });
-          wx.showToast({ title: '已清空', icon: 'success' });
-        }
-      },
-    });
-  },
 
 
 });

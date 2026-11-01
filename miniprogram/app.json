@@ -2,13 +2,15 @@
   "pages": [
     "pages/index/index",
     "pages/editor/editor",
+    "pages/record/record",
+    "pages/library/library",
     "pages/settings/settings"
   ],
   "window": {
     "backgroundColor": "#F8F6F2",
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#F8F6F2",
-    "navigationBarTitleText": "音频格式转换",
+    "navigationBarTitleText": "音频工具箱",
     "navigationBarTextStyle": "black"
   },
   "sitemapLocation": "sitemap.json",

@@ -1,0 +1,152 @@
+<!-- miniprogram/pages/record/record.wxml -->
+<!-- 现场录音页（v5.1 · FR-30）：idle / recording / paused / review 四态 -->
+<view class="page-record">
+
+  <!-- 顶部品牌区 -->
+  <view class="page-header">
+    <view class="brand-tag">
+      <text class="brand-dot"></text>
+      <text class="brand-tag-text">RECORD</text>
+    </view>
+    <text class="brand-title">现场录音</text>
+    <text class="brand-desc">麦克风直录 · 最长 10 分钟 · 录完即可转换或剪辑</text>
+  </view>
+
+  <!-- 异常提示卡（权限 / 隐私 / 录音失败） -->
+  <view wx:if="{{errorText}}" class="error-card">
+    <view class="error-head">
+      <text class="error-icon">⚠️</text>
+      <text class="error-title">{{errorTitle}}</text>
+    </view>
+    <text class="error-body">{{errorText}}</text>
+    <view class="error-actions">
+      <view wx:if="{{errorKind === 'auth'}}" class="error-btn" bindtap="onOpenSettings" hover-class="btn-hover">去设置</view>
+      <view class="error-btn solid" bindtap="onRetryRecord" hover-class="btn-hover">重试录音</view>
+    </view>
+  </view>
+
+  <!-- 主录音卡 -->
+  <view class="card-panel">
+
+    <!-- IDLE：点击开始录音 -->
+    <view wx:if="{{status === 'idle'}}" class="idle-stage">
+      <view class="record-orb" bindtap="onStartRecord" hover-class="record-orb-hover">
+        <view class="record-orb-ring"></view>
+        <text class="orb-icon">🎙️</text>
+        <text class="orb-label">开始录音</text>
+      </view>
+      <text class="idle-hint">点击开始录音</text>
+      <text class="idle-sub">录音会使用本机麦克风，首次使用需授权</text>
+      <view class="spec-row">
+        <text class="spec-chip">MP3 · 44.1kHz</text>
+        <text class="spec-chip">立体声 192kbps</text>
+        <text class="spec-chip">最长 10 分钟</text>
+      </view>
+    </view>
+
+    <!-- RECORDING / PAUSED：计时 + 假声波 + 暂停/继续 + 完成 -->
+    <view wx:elif="{{status === 'recording' || status === 'paused'}}" class="active-stage">
+      <view class="status-pill {{status === 'recording' ? 'live' : 'paused'}}">
+        <view class="live-dot"></view>
+        <text>{{status === 'recording' ? '正在录音' : '已暂停'}}</text>
+      </view>
+      <text class="timer-display {{status === 'paused' ? 'is-paused' : ''}}">{{elapsedText}}</text>
+      <view class="wave-wrap {{status === 'recording' ? 'is-live' : 'is-frozen'}}">
+        <view
+          wx:for="{{waveBars}}"
+          wx:key="id"
+          class="wave-bar"
+          style="height: {{item.h}}rpx; animation-delay: {{item.d}}ms;"
+        ></view>
+      </view>
+      <text wx:if="{{interrupted}}" class="interrupted-hint">录音被系统中断，已暂停，点击「继续」恢复</text>
+      <text wx:else class="active-hint">{{status === 'recording' ? '正在录音，最长 10 分钟，到时自动保存' : '计时已暂停，可继续录音或直接完成'}}</text>
+      <view class="control-row">
+        <view wx:if="{{status === 'recording'}}" class="ctrl-btn ghost" bindtap="onPauseRecord" hover-class="btn-hover">
+          <text class="ctrl-icon">⏸</text>
+          <text>暂停</text>
+        </view>
+        <view wx:else class="ctrl-btn ghost accent" bindtap="onResumeRecord" hover-class="btn-hover">
+          <text class="ctrl-icon">▶</text>
+          <text>继续</text>
+        </view>
+        <view class="ctrl-btn finish" bindtap="onFinishRecord" hover-class="btn-hover">
+          <text class="ctrl-icon">✓</text>
+          <text>完成</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- REVIEW：试听 + 去向 -->
+    <view wx:elif="{{status === 'review'}}" class="review-stage">
+      <view class="status-pill done">
+        <view class="live-dot"></view>
+        <text>录制完成</text>
+      </view>
+
+      <view class="review-file">
+        <view class="file-emoji">🎧</view>
+        <view class="file-meta">
+          <text class="file-name">{{fileName}}</text>
+          <text class="file-spec">{{durationText}} · {{sizeText}} · MP3 立体声</text>
+        </view>
+      </view>
+
+      <view class="preview-player">
+        <view class="player-toggle {{isPlaying ? 'playing' : ''}}" bindtap="onTogglePreview" hover-class="btn-hover">
+          <text>{{isPlaying ? '⏸' : '▶'}}</text>
+        </view>
+        <view class="player-slider-wrap">
+          <slider
+            class="player-slider"
+            min="0"
+            max="{{previewDuration || 1}}"
+            value="{{previewValue}}"
+            step="0.1"
+            block-size="14"
+            activeColor="#FF6B00"
+            backgroundColor="#E7E5E4"
+            bindchange="onPreviewSeek"
+          />
+          <view class="player-time-row">
+            <text class="player-time">{{previewCurrentText}}</text>
+            <text class="player-time">{{previewDurationText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <text class="review-hint">{{fromSource === 'editor' ? '推荐去向：音乐剪辑 · 导入后可继续裁剪' : '推荐去向：格式转换 · 返回首页即可开始'}}</text>
+
+      <view class="action-col">
+        <view class="primary-action" bindtap="onGoConvert" hover-class="btn-hover">
+          <text>⚡</text>
+          <text>去转换</text>
+        </view>
+        <view class="secondary-action" bindtap="onGoEditor" hover-class="btn-hover">
+          <text>✂️</text>
+          <text>去剪辑</text>
+        </view>
+        <view class="ghost-action" bindtap="onRestartRecord" hover-class="btn-hover">重新录制</view>
+      </view>
+    </view>
+
+  </view>
+
+  <!-- 底部说明 -->
+  <view class="tips-card">
+    <text class="tips-title">录音说明</text>
+    <view class="tip-row">
+      <text class="tip-dot"></text>
+      <text>录音保存在微信本机临时目录，转换或剪辑完成后请及时保存。</text>
+    </view>
+    <view class="tip-row">
+      <text class="tip-dot"></text>
+      <text>页面切到后台会自动暂停录音；来电或语音通话中断后不会自动继续。</text>
+    </view>
+    <view class="tip-row">
+      <text class="tip-dot"></text>
+      <text>若提示隐私未配置，请在小程序后台「用户隐私保护指引」声明「访问你的麦克风」。</text>
+    </view>
+  </view>
+
+</view>
