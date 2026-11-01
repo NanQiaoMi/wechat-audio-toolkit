@@ -312,6 +312,90 @@ async function runAll() {
     assert.strictEqual(page.data.status, 'idle');
   });
 
+  await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 规避微信原生压缩与音频解码失败', async () => {
+    let capturedOpts = null;
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    global.wx = {
+      chooseMedia: (opts) => {
+        capturedOpts = opts;
+      },
+      showToast: () => {},
+      showModal: () => {},
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.chooseAlbumVideo();
+    assert.ok(capturedOpts, 'wx.chooseMedia 必须被调用');
+    assert.deepStrictEqual(capturedOpts.sizeType, ['original'], 'sizeType 必须强制为 original 以绕过原生压缩');
+    assert.deepStrictEqual(capturedOpts.mediaType, ['video']);
+  });
+
+  await itAsync('chooseAlbumVideo: 降级 wx.chooseVideo 强制传入 compressed: false 规避原生压缩', async () => {
+    let capturedVideoOpts = null;
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    global.wx = {
+      chooseMedia: undefined, // 模拟旧基础库
+      chooseVideo: (opts) => {
+        capturedVideoOpts = opts;
+      },
+      showToast: () => {},
+      showModal: () => {},
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.chooseAlbumVideo();
+    assert.ok(capturedVideoOpts, 'wx.chooseVideo 必须被调用');
+    assert.strictEqual(capturedVideoOpts.compressed, false, 'compressed 必须为 false 禁用压缩');
+  });
+
+  await itAsync('chooseAlbumVideo: 捕获微信相册原生解码/压缩错误并提供友好弹窗指引', async () => {
+    let modalShown = null;
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    global.wx = {
+      chooseMedia: (opts) => {
+        opts.fail({ errMsg: 'chooseMedia:fail audio decode error' });
+      },
+      showToast: () => {},
+      showModal: (modal) => {
+        modalShown = modal;
+      },
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.chooseAlbumVideo();
+    assert.ok(modalShown, '必须弹出友好指导弹窗');
+    assert.strictEqual(modalShown.title, '相册视频读取异常');
+    assert.ok(modalShown.content.indexOf('聊天会话') >= 0);
+  });
+
+  it('videoExtractor.MAX_CLOUD_VIDEO_BYTES: 同步放宽至 500MB', () => {
+    assert.strictEqual(videoExtractor.MAX_CLOUD_VIDEO_BYTES, 500 * 1024 * 1024);
+  });
+
   console.log('\n# 4. 路由与跨模块入口一致性核查');
 
   it('app.json 包含 pages/video-extract/video-extract 路由', () => {

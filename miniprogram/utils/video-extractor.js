@@ -10,7 +10,7 @@
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024; // 500MB 限制 (放宽至 500MB，覆盖 95%+ 手机高清拍摄)
 const LARGE_VIDEO_THRESHOLD_BYTES = 300 * 1024 * 1024; // 300MB 以上大文件友好提醒
 const MAX_VIDEO_DURATION_SEC = 1800; // 最长建议 30 分钟
-const MAX_CLOUD_VIDEO_BYTES = 100 * 1024 * 1024; // 云端兜底由于 60s 超时仍保持 100MB 限制
+const MAX_CLOUD_VIDEO_BYTES = 500 * 1024 * 1024; // 云端兜底同步支持至 500MB 规格
 
 /**
  * 格式化秒数为 mm:ss 或 hh:mm:ss
@@ -285,10 +285,14 @@ function extractAudioViaCloud(fileID, fileName = 'video.mp4', options = {}) {
         }
       },
       fail: (err) => {
+        let msg = `云函数调用失败: ${err && err.errMsg || err}`;
+        if (msg.indexOf('FUNCTION_NOT_FOUND') >= 0 || msg.indexOf('not found') >= 0) {
+          msg += ' (请先在微信开发者工具中右键 cloudfunctions/ffmpegProbe 目录点击「上传并部署：云端安装依赖」)';
+        }
         resolve({
           success: false,
           mode: 'cloud',
-          errorMessage: `云函数调用失败: ${err && err.errMsg || err}`,
+          errorMessage: msg,
         });
       },
     });

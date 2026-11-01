@@ -121,6 +121,7 @@ Page({
         count: 1,
         mediaType: ['video'],
         sourceType: ['album', 'camera'],
+        sizeType: ['original'], // 【关键】强制原视频，完全绕过微信客户端原生压缩与脆弱解码导致的“压缩中/音频解码失败”
         success: (res) => {
           const item = res && res.tempFiles && res.tempFiles[0];
           if (!item) return;
@@ -134,12 +135,23 @@ Page({
         },
         fail: (err) => {
           if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
-          wx.showToast({ title: '选取视频失败', icon: 'none' });
+          console.warn('[video-extract] chooseMedia 失败:', err);
+          const errMsg = String(err && (err.errMsg || err.message || JSON.stringify(err)) || '').toLowerCase();
+          if (errMsg.indexOf('decode') >= 0 || errMsg.indexOf('codec') >= 0 || errMsg.indexOf('compress') >= 0) {
+            wx.showModal({
+              title: '相册视频读取异常',
+              content: '微信原生相册组件解析该视频异常。建议在相册选择时取消压缩，或尝试使用「从聊天会话选择」选取视频原文件。',
+              showCancel: false,
+            });
+          } else {
+            wx.showToast({ title: '选取视频失败', icon: 'none' });
+          }
         },
       });
     } else if (wx.chooseVideo) {
       wx.chooseVideo({
         sourceType: ['album', 'camera'],
+        compressed: false, // 【关键】禁用微信原生压缩，规避原生压缩器解码失败
         success: (res) => {
           this.handleSelectedVideo({
             tempFilePath: res.tempFilePath,
@@ -151,6 +163,7 @@ Page({
         },
         fail: (err) => {
           if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
+          console.warn('[video-extract] chooseVideo 失败:', err);
           wx.showToast({ title: '选取视频失败', icon: 'none' });
         },
       });
@@ -244,11 +257,10 @@ Page({
     }
 
     // ---- 策略 2：优雅降级至云端 FFmpeg 强力抽取 ----
-    // 云端因 60s 超时限制，单个视频上限为 100MB
     if (rawFile.size > videoExtractor.MAX_CLOUD_VIDEO_BYTES) {
       this.setData({
         status: 'error',
-        errorMessage: `该视频编码较特殊，手机本地无法直接解封装；且大小为 ${videoExtractor.formatBytes(rawFile.size)}（超过云端 60 秒超时 100MB 限额）。建议先将视频保存为标准 MP4 格式或裁剪后再提取。`,
+        errorMessage: `该视频编码较特殊，手机本地无法直接解封装；且大小为 ${videoExtractor.formatBytes(rawFile.size)}（超过云端支持限额 ${videoExtractor.formatBytes(videoExtractor.MAX_CLOUD_VIDEO_BYTES)}）。建议先将视频裁剪后再提取。`,
       });
       return;
     }
@@ -302,9 +314,13 @@ Page({
         costMs,
       });
     } catch (err) {
+      let errMsg = String((err && err.message) || err || '音轨提取失败，请重试');
+      if (errMsg.indexOf('FUNCTION_NOT_FOUND') >= 0 || errMsg.indexOf('not found') >= 0 || errMsg.indexOf('云函数调用失败') >= 0) {
+        errMsg += '\n\n【部署提示】若您在真机测试遇到此提示，请在微信开发者工具中右键 cloudfunctions/ffmpegProbe 目录，选择「上传并部署：云端安装依赖」，等待部署完成后即可使用云端转码。';
+      }
       this.setData({
         status: 'error',
-        errorMessage: String((err && err.message) || err || '音轨提取失败，请重试'),
+        errorMessage: errMsg,
       });
     }
   },
