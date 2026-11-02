@@ -770,7 +770,9 @@
   align-items: stretch !important;
   gap: 14rpx !important;
   width: 100% !important;
+  max-width: 100% !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .sub-export-row .sub-btn,
@@ -778,7 +780,7 @@
   flex: 1 1 0% !important;
   width: 0 !important;
   min-width: 0 !important;
-  max-width: 100% !important;
+  max-width: calc(50% - 7rpx) !important;
   box-sizing: border-box !important;
   margin: 0 !important;
   padding: 0 10rpx !important;

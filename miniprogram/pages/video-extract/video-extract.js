@@ -250,9 +250,9 @@ Page({
     const durSec = rawFile.duration ? Math.round(rawFile.duration) : 0;
     this.setData({
       status: 'extracting',
-      isCloudProcessing: false,
-      extractTitle: '正在从视频中无损剥离音轨…',
-      extractSubTip: check.largeNotice || '本地硬件解封装中，毫秒级出声',
+      isCloudProcessing: true,
+      extractTitle: '正在上传视频至云端提取…',
+      extractSubTip: check.largeNotice || '云端 FFmpeg 7.0 强力引擎，100% 格式兼容，转为通用高音质 MP3',
       videoInfo: {
         name: rawFile.name || '未命名视频.mp4',
         size: rawFile.size,
@@ -268,41 +268,7 @@ Page({
 
     const startTime = Date.now();
 
-    // ---- 策略 1：本地硬件解封装 (MediaContainer) ----
-    const localRes = await videoExtractor.extractAudioLocally(rawFile.tempFilePath);
-    if (localRes.success && localRes.tempFilePath) {
-      const costMs = Date.now() - startTime;
-      const finalDur = localRes.duration || durSec || 1;
-      const finalSize = localRes.size || Math.round(rawFile.size * 0.05); // 预估约原视频 5%
-
-      this.applyExtractionResult({
-        title: `${rawFile.name.replace(/\.[^.]+$/, '')}_原声`,
-        format: localRes.format || 'm4a',
-        duration: finalDur,
-        size: finalSize,
-        tempFilePath: localRes.tempFilePath,
-        fileID: '',
-        mode: 'local',
-        costMs,
-      });
-      return;
-    }
-
-    // ---- 策略 2：智能优雅降级至云端 FFmpeg 强力转码 ----
-    // 💡 流量极限瘦身：若本地已成功解出纯音频流（仅 2MB~5MB），优先仅上传该纯音频，节省 98% 流量与等待时间！
-    if (localRes.fallbackToCloud && localRes.localAudioFilePath) {
-      await this.startCloudExtraction({
-        tempFilePath: localRes.localAudioFilePath,
-        size: localRes.localAudioSize || 0,
-        duration: localRes.duration || durSec,
-        name: `${rawFile.name.replace(/\.[^.]+$/, '')}_原声.m4a`,
-        isAudioOnlyUpload: true,
-        sourceVideoName: rawFile.name,
-      }, startTime);
-      return;
-    }
-
-    // 若本地底层连容器都无法解析（如冷门格式/损坏文件），才上传原始视频完整兜底
+    // 🚀 用户指定：不走本地解封装上传，直接发起云端高精转码抽取（100% 格式兼容，规避手机芯片解码限制）
     await this.startCloudExtraction(rawFile, startTime);
   },
 

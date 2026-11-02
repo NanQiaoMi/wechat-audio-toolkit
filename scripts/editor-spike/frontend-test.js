@@ -2300,6 +2300,89 @@ smokeTest('触感微交互、拖拽悬浮时码气泡与自适应标尺密度集
   page.onUnload();
 });
 
+smokeTest('v6.6 倍速动态平滑切换、多轨8轨扩容、全幅波形图无截断与吸底按钮布局防遮挡验证', async () => {
+  const fileMaster = { path: 'wxfile://tmp/track_master.mp3', size: 10 * 1024 * 1024, name: 'master.mp3' };
+  const fileVocal = { path: 'wxfile://tmp/track_vocal.mp3', size: 5 * 1024 * 1024, name: 'vocal.mp3' };
+  const stub = createWxStub({
+    chooseBatches: [[fileMaster, fileVocal]],
+    analyzeResults: [
+      makeAnalyzeResponse({ duration: 240 }),
+      makeAnalyzeResponse({ duration: 60 }),
+    ],
+  });
+  const page = loadEditorPage(stub.wx);
+  page.onLoad();
+  page.onShow();
+  await wait(10);
+
+  // 1. 验证音轨初始默认 4 轨，且可一路扩容至 8 条音轨
+  assert.strictEqual(page.data.tracks.length, 4, '初始默认应具备 4 条音轨');
+  assert.strictEqual(page.data.tracks[0].id, 'T1');
+  assert.strictEqual(page.data.tracks[3].id, 'T4');
+  
+  // 逐一添加音轨至第 8 轨
+  page.addTrack(); // T5
+  page.addTrack(); // T6
+  page.addTrack(); // T7
+  page.addTrack(); // T8
+  assert.strictEqual(page.tracks.length, 8, '应成功扩容至 8 条音轨');
+  
+  // 尝试添加第 9 轨被硬限拦截
+  page.addTrack();
+  assert.strictEqual(page.tracks.length, 8, '超过 8 条音轨时应被硬限拦截');
+  const lastToast = stub.calls.toast[stub.calls.toast.length - 1];
+  assert.ok(lastToast && lastToast.title.indexOf('最多支持 8 条') >= 0);
+
+  // 2. 导入音频并验证波形全幅生成
+  page.chooseAudioFiles();
+  await wait(80);
+  assert.strictEqual(page.sources.length, 2);
+  assert.strictEqual(page.clips.length, 2);
+
+  // 将片段设为 240s 的长音频
+  page.clips[0].in = 0;
+  page.clips[0].out = 240;
+  page.clips[0].speed = 1.0;
+  page.refreshClipData();
+
+  // 验证 1.0x 倍速下成片与波形
+  const tlData1x = page.data.timelineData;
+  const clipTrack1x = tlData1x.tracks.find(t => t.clips && t.clips.length > 0);
+  assert.ok(clipTrack1x, '应存在包含片段的轨道');
+  const clip0View1x = clipTrack1x.clips[0];
+  assert.strictEqual(clip0View1x.timelineEndSec, 240);
+  assert.ok(clip0View1x.waveBars.length >= 20, '波形条应充足生成');
+
+  // 3. 启动播放并在播放中动态切换 1.5x 倍速，验证不中断、不从头重置
+  page.togglePlayClip();
+  assert.strictEqual(page.data.isPlaying, true, '应处于播放中');
+  page.currentSourceTime = 30.5; // 播放至 30.5 秒
+
+  // 在播放态下动态切换倍速为 1.5x
+  page.setClipSpeed({ currentTarget: { dataset: { value: 1.5 } } });
+  assert.strictEqual(page.data.isPlaying, true, '动态调整倍速后必须保持继续播放，绝不中断');
+  assert.strictEqual(page.clips[0].speed, 1.5, '片段倍速应正确更新为 1.5x');
+  assert.strictEqual(page._playbackSpeed, 1.5, '物理时钟倍速锚点必须同步更新为 1.5x');
+  assert.strictEqual(page.currentSourceTime, 30.5, '播放指针必须保留当前秒数，绝不可倒退重置回 00:00');
+
+  // 验证 1.5x 倍速下时间轴占用时长缩短 (240s / 1.5 = 160s)
+  const tlData15x = page.data.timelineData;
+  const clipTrack15x = tlData15x.tracks.find(t => t.clips && t.clips.length > 0);
+  assert.ok(clipTrack15x, '应存在包含片段的轨道');
+  const clip0View15x = clipTrack15x.clips[0];
+  assert.strictEqual(clip0View15x.timelineEndSec, 160, '1.5x 倍速下时间线末端应等比缩短为 160s');
+  assert.strictEqual(clip0View15x.effectiveDuration, 160);
+
+  // 4. 验证 CSS 契约：全幅波形 space-between 与吸底导出按键防遮挡
+  const editorWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/editor/editor.wxss'), 'utf-8');
+  assert.ok(editorWxss.includes('justify-content: space-between'), '波形容器必须使用 justify-content: space-between 全幅自适应满铺');
+  assert.ok(editorWxss.includes('dock-export-action-btn'), '必须包含 dock-export-action-btn 导出按钮样式');
+  assert.ok(editorWxss.includes('max-width: 52% !important'), '导出按钮必须限制 max-width 避免覆盖左侧时码');
+  assert.ok(editorWxss.includes('width: auto !important'), '导出按钮必须显式强制重置原生宽度');
+
+  page.onUnload();
+});
+
 /* ========================================================================== */
 /* 汇总                                                                       */
 /* ========================================================================== */
