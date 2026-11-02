@@ -336,102 +336,119 @@
 ============================================================ */
 .result-card {
   align-items: stretch;
-  padding: 30rpx 26rpx;
-  gap: 22rpx;
+  padding: 34rpx 28rpx;
+  gap: 24rpx;
+  background-color: #FFFFFF;
+  border-radius: 32rpx;
+  box-shadow: 0 6rpx 28rpx rgba(0, 0, 0, 0.03);
 }
 
 .result-status-header {
   display: flex;
   align-items: center;
   gap: 16rpx;
+  padding-bottom: 4rpx;
 }
 
 .result-check-badge {
-  width: 44rpx;
-  height: 44rpx;
+  width: 48rpx;
+  height: 48rpx;
   border-radius: 50%;
   background-color: #16A34A;
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26rpx;
+  font-size: 28rpx;
   font-weight: 900;
   flex-shrink: 0;
+  box-shadow: 0 4rpx 12rpx rgba(22, 163, 74, 0.25);
 }
 
 .result-title-group {
   display: flex;
   flex-direction: column;
   flex: 1;
+  gap: 4rpx;
 }
 
 .result-headline {
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 800;
   color: #1C1917;
 }
 
 .result-speed-tag {
-  font-size: 20rpx;
+  font-size: 21rpx;
   color: #16A34A;
   font-weight: 600;
 }
 
 .repick-btn {
-  background-color: #F5F3EE;
-  border-radius: 20rpx;
-  padding: 8rpx 18rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  background-color: #FAF8F5;
+  border: 1px solid #EAE6DF;
+  border-radius: 24rpx;
+  padding: 10rpx 20rpx;
   font-size: 22rpx;
   color: #57534E;
   font-weight: 600;
+  transition: all 0.16s ease;
 }
 
 .repick-btn:active {
   background-color: #EAE6DF;
+  transform: scale(0.96);
+}
+
+.repick-icon {
+  font-size: 22rpx;
 }
 
 /* 提取元数据横幅 */
 .extracted-meta-card {
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 20rpx;
   background-color: #FAF8F5;
   border: 1px solid #EAE6DF;
-  border-radius: 20rpx;
-  padding: 18rpx 20rpx;
+  border-radius: 22rpx;
+  padding: 20rpx 22rpx;
 }
 
 .video-thumb {
-  width: 90rpx;
-  height: 90rpx;
-  border-radius: 14rpx;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 16rpx;
   background-color: #000000;
   flex-shrink: 0;
 }
 
 .video-thumb-placeholder {
-  width: 90rpx;
-  height: 90rpx;
-  border-radius: 14rpx;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 16rpx;
   background-color: #F0EDE6;
+  border: 1px solid #E5E1D8;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40rpx;
+  font-size: 44rpx;
   flex-shrink: 0;
 }
 
 .extracted-text-group {
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 10rpx;
   flex: 1;
   min-width: 0;
 }
 
 .extracted-audio-name {
-  font-size: 25rpx;
+  font-size: 26rpx;
   font-weight: 700;
   color: #1C1917;
   overflow: hidden;
@@ -441,13 +458,15 @@
 
 .extracted-tags-row {
   display: flex;
+  align-items: center;
   gap: 10rpx;
+  flex-wrap: wrap;
 }
 
 .tag-capsule {
   border-radius: 8rpx;
-  padding: 2rpx 10rpx;
-  font-size: 19rpx;
+  padding: 3rpx 12rpx;
+  font-size: 20rpx;
   font-weight: 700;
 }
 
@@ -470,7 +489,7 @@
   background-color: #FEF3C7;
   color: #B45309;
   border: 1px solid #FCD34D;
-  margin-left: 6rpx;
+  margin-left: 4rpx;
 }
 
 .tag-hover {
@@ -480,21 +499,21 @@
 
 /* 原声高保真试听面板 */
 .audition-player-panel {
-  background-color: #FFFFFF;
+  background-color: #FAF8F5;
   border: 1px solid #EAE6DF;
-  border-radius: 20rpx;
-  padding: 20rpx 22rpx;
+  border-radius: 24rpx;
+  padding: 22rpx 24rpx;
 }
 
 .player-controls-row {
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 20rpx;
 }
 
 .player-toggle-btn {
-  width: 76rpx;
-  height: 76rpx;
+  width: 82rpx;
+  height: 82rpx;
   border-radius: 50%;
   background-color: #1C1917;
   color: #FFFFFF;
@@ -502,13 +521,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4rpx 12rpx rgba(28, 25, 23, 0.2);
-  transition: transform 0.16s ease;
+  box-shadow: 0 4rpx 14rpx rgba(28, 25, 23, 0.22);
+  transition: transform 0.16s ease, background-color 0.2s ease;
 }
 
 .player-toggle-btn.playing {
-  background-color: #16A34A;
-  box-shadow: 0 4rpx 12rpx rgba(22, 163, 74, 0.3);
+  background-color: #FF6B00;
+  box-shadow: 0 4rpx 16rpx rgba(255, 107, 0, 0.35);
 }
 
 .player-btn-hover {
@@ -516,7 +535,7 @@
 }
 
 .player-btn-glyph {
-  font-size: 30rpx;
+  font-size: 32rpx;
   line-height: 1;
 }
 
@@ -524,24 +543,40 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 4rpx;
+  gap: 6rpx;
 }
 
 .player-time-row {
   display: flex;
   justify-content: space-between;
-  padding: 0 6rpx;
+  align-items: center;
+  padding: 0 4rpx;
+}
+
+.player-time-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
 }
 
 .player-time-current {
-  font-size: 21rpx;
+  font-size: 22rpx;
   font-weight: 800;
   color: #FF6B00;
   font-family: monospace;
 }
 
+.player-status-tag {
+  font-size: 19rpx;
+  font-weight: 700;
+  color: #16A34A;
+  background-color: #ECFDF5;
+  border-radius: 8rpx;
+  padding: 1rpx 8rpx;
+}
+
 .player-time-total {
-  font-size: 21rpx;
+  font-size: 22rpx;
   color: #78716C;
   font-family: monospace;
 }
@@ -551,89 +586,187 @@
   width: 100%;
 }
 
-/* 四大去向操作网格 */
-.next-actions-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14rpx;
-  margin-top: 6rpx;
+/* ============================================================
+   操作导出按钮组体系
+============================================================ */
+.result-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-top: 4rpx;
 }
 
-.action-card {
-  background-color: #FFFFFF;
-  border: 1px solid #EAE6DF;
-  border-radius: 20rpx;
-  padding: 22rpx 18rpx;
+.export-btn {
+  border-radius: 24rpx;
+  padding: 0 28rpx;
+  font-size: 28rpx;
+  font-weight: 700;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12rpx;
-  transition: transform 0.16s ease, border-color 0.16s ease;
-}
-
-.action-card.primary {
-  border-color: rgba(255, 107, 0, 0.3);
-  background-color: #FFFDF9;
-}
-
-.action-card.secondary {
-  border-color: #E2DDD5;
-  background-color: #FAF8F5;
-}
-
-.action-card.tertiary {
-  border-color: #EAE6DF;
-}
-
-.action-card.quaternary {
-  border-color: #EAE6DF;
-}
-
-.action-card-hover {
-  transform: scale(0.97);
-  background-color: #F5F3EE;
-}
-
-.action-icon-box {
-  font-size: 36rpx;
+  border: none;
   line-height: 1;
+  box-sizing: border-box;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.btn-hover-scale {
+  transform: scale(0.98);
+  opacity: 0.92;
+}
+
+/* 核心英雄级主行动：送入多轨剪辑 */
+.export-btn.primary-editor {
+  background-color: #FF6B00;
+  color: #FFFFFF;
+  height: 98rpx;
+  justify-content: space-between;
+  box-shadow: 0 8rpx 24rpx rgba(255, 107, 0, 0.32);
+}
+
+.btn-icon-emoji {
+  font-size: 34rpx;
   flex-shrink: 0;
 }
 
-.action-info {
+.btn-text-col {
   display: flex;
   flex-direction: column;
-  gap: 2rpx;
+  align-items: flex-start;
+  gap: 4rpx;
+  flex: 1;
+  margin-left: 8rpx;
+}
+
+.btn-main-title {
+  font-size: 29rpx;
+  font-weight: 800;
+  letter-spacing: 0.5rpx;
+}
+
+.btn-sub-title {
+  font-size: 20rpx;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.btn-arrow-icon {
+  font-size: 26rpx;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+/* 双列次级操作区 */
+.sub-export-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+}
+
+.export-btn.primary-share {
+  background-color: #16A34A;
+  color: #FFFFFF;
+  height: 84rpx;
+  box-shadow: 0 4rpx 16rpx rgba(22, 163, 74, 0.22);
+  font-size: 26rpx;
+}
+
+.export-btn.secondary-save {
+  background-color: #FAF8F5;
+  color: #1C1917;
+  border: 1px solid #D6D1C7;
+  height: 84rpx;
+  font-size: 26rpx;
+}
+
+/* 辅助工具：格式转换与压缩 */
+.converter-utility-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FAF8F5;
+  border: 1px solid #EAE6DF;
+  border-radius: 20rpx;
+  padding: 18rpx 22rpx;
+  transition: all 0.16s ease;
+}
+
+.utility-hover {
+  background-color: #F5F3EE;
+  transform: scale(0.98);
+}
+
+.utility-left {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
   flex: 1;
   min-width: 0;
 }
 
-.action-name {
-  font-size: 24rpx;
+.utility-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.utility-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+}
+
+.utility-title {
+  font-size: 25rpx;
   font-weight: 800;
   color: #1C1917;
-  white-space: nowrap;
 }
 
-.action-desc {
-  font-size: 18rpx;
+.utility-sub {
+  font-size: 19rpx;
   color: #78716C;
-  white-space: nowrap;
 }
 
-.action-arrow {
-  font-size: 22rpx;
+.utility-arrow {
+  font-size: 24rpx;
   color: #A8A29E;
   flex-shrink: 0;
 }
 
-.action-badge-state {
-  font-size: 18rpx;
-  font-weight: 800;
-  color: #16A34A;
-  background-color: #ECFDF5;
-  border-radius: 8rpx;
-  padding: 2rpx 8rpx;
-  flex-shrink: 0;
+/* 底部辅助链接 */
+.aux-links-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10rpx 4rpx 0;
+  border-top: 1px dashed #E7E5E4;
+}
+
+.aux-link-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #57534E;
+  padding: 6rpx 4rpx;
+  transition: opacity 0.16s ease;
+}
+
+.aux-link-item:active {
+  opacity: 0.65;
+}
+
+.aux-link-icon {
+  font-size: 24rpx;
+}
+
+.aux-link-item.library-link {
+  color: #B45309;
+}
+
+.aux-link-item.reset-btn {
+  color: #78716C;
 }
 
 /* ============================================================

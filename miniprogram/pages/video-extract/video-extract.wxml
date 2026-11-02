@@ -77,9 +77,10 @@
       <view class="result-check-badge">✓</view>
       <view class="result-title-group">
         <text class="result-headline">音频提取成功</text>
-        <text class="result-speed-tag">{{speedDescText || ('耗时 ' + extractCostMs + 'ms · ' + (extractMode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'))}}</text>
+        <text class="result-speed-tag">{{speedDescText || ('耗时 ' + (extractCostText || (extractCostMs + 'ms')) + ' · ' + (extractMode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'))}}</text>
       </view>
       <view class="repick-btn" bindtap="resetToPicker" hover-class="btn-hover">
+        <text class="repick-icon">🔄</text>
         <text>重选</text>
       </view>
     </view>
@@ -103,7 +104,7 @@
     <!-- 即时原声高保真试听器 (Audition Player) -->
     <view class="audition-player-panel">
       <view class="player-controls-row">
-        <!-- 播放/暂停胶囊按键 -->
+        <!-- 播放/暂停按键 -->
         <view class="player-toggle-btn {{isPlaying ? 'playing' : ''}}" bindtap="togglePlayAudio" hover-class="player-btn-hover">
           <text class="player-btn-glyph">{{isPlaying ? '⏸' : '▶'}}</text>
         </view>
@@ -111,7 +112,10 @@
         <!-- 寻位滑条与起止时间 -->
         <view class="player-seek-wrapper">
           <view class="player-time-row">
-            <text class="player-time-current">{{playCurrentTimeText}}</text>
+            <view class="player-time-left">
+              <text class="player-time-current">{{playCurrentTimeText}}</text>
+              <text wx:if="{{isPlaying}}" class="player-status-tag">● 正在试听</text>
+            </view>
             <text class="player-time-total">{{resultAudio.durationText}}</text>
           </view>
           <slider
@@ -119,9 +123,9 @@
             min="0"
             max="{{sliderMax}}"
             value="{{sliderValue}}"
-            backgroundColor="#E5E5E5"
+            backgroundColor="#E7E5E4"
             activeColor="#FF6B00"
-            block-size="16"
+            block-size="14"
             block-color="#FF6B00"
             bindchanging="onSliderChanging"
             bindchange="onSliderChange"
@@ -130,46 +134,52 @@
       </view>
     </view>
 
-    <!-- 核心四大去向操作网格 -->
-    <view class="next-actions-grid">
-      <!-- 送入多轨剪辑 -->
-      <view class="action-card primary" bindtap="sendToEditor" hover-class="action-card-hover">
-        <view class="action-icon-box">✂️</view>
-        <view class="action-info">
-          <text class="action-name">送入多轨剪辑</text>
-          <text class="action-desc">挂载到音轨 · 裁剪变速对齐</text>
+    <!-- 核心操作按钮组 -->
+    <view class="result-action-buttons">
+      <!-- 英雄主行动：送入多轨剪辑 -->
+      <button class="export-btn primary-editor" bindtap="sendToEditor" hover-class="btn-hover-scale">
+        <text class="btn-icon-emoji">✂️</text>
+        <view class="btn-text-col">
+          <text class="btn-main-title">送入多轨剪辑</text>
+          <text class="btn-sub-title">自由裁剪 · 多轨混音 · 智能变速</text>
         </view>
-        <text class="action-arrow">➔</text>
-      </view>
+        <text class="btn-arrow-icon">➔</text>
+      </button>
 
-      <!-- 送入格式转换/压缩 -->
-      <view class="action-card secondary" bindtap="sendToConverter" hover-class="action-card-hover">
-        <view class="action-icon-box">⚡</view>
-        <view class="action-info">
-          <text class="action-name">转格式 / 压缩</text>
-          <text class="action-desc">转 MP3/WAV · 高保真压缩</text>
-        </view>
-        <text class="action-arrow">➔</text>
+      <!-- 双列操作区：发好友 / 保存至手机 -->
+      <view class="sub-export-row">
+        <button class="export-btn primary-share" bindtap="shareOrSaveAudio" hover-class="btn-hover-scale">
+          <text class="btn-icon-emoji">🚀</text>
+          <text>发给微信好友</text>
+        </button>
+        <button class="export-btn secondary-save" bindtap="saveToLocalDisk" hover-class="btn-hover-scale">
+          <text class="btn-icon-emoji">💾</text>
+          <text>保存至手机</text>
+        </button>
       </view>
+    </view>
 
-      <!-- 存入我的作品 -->
-      <view class="action-card tertiary" bindtap="saveToMyLibrary" hover-class="action-card-hover">
-        <view class="action-icon-box">📚</view>
-        <view class="action-info">
-          <text class="action-name">{{isSavedToLibrary ? '已存入我的作品' : '存入我的作品'}}</text>
-          <text class="action-desc">云端保存 · 随时导出分享</text>
+    <!-- 辅助工具：格式转换与压缩 -->
+    <view class="converter-utility-card" bindtap="sendToConverter" hover-class="utility-hover">
+      <view class="utility-left">
+        <text class="utility-icon">⚡</text>
+        <view class="utility-text-group">
+          <text class="utility-title">转格式 / 压缩音频</text>
+          <text class="utility-sub">转 MP3/WAV/FLAC 或一键极限压缩</text>
         </view>
-        <text class="action-badge-state">{{isSavedToLibrary ? '已存' : '+'}}</text>
       </view>
+      <text class="utility-arrow">➔</text>
+    </view>
 
-      <!-- 分享或保存 -->
-      <view class="action-card quaternary" bindtap="shareOrSaveAudio" hover-class="action-card-hover">
-        <view class="action-icon-box">📤</view>
-        <view class="action-info">
-          <text class="action-name">发送 / 导出</text>
-          <text class="action-desc">分享好友或保存到手机</text>
-        </view>
-        <text class="action-arrow">➔</text>
+    <!-- 底部辅助行：我的作品 + 重新提取 -->
+    <view class="aux-links-row">
+      <view class="aux-link-item library-link" bindtap="goLibrary">
+        <text class="aux-link-icon">📚</text>
+        <text>我的作品 (已自动入库)</text>
+      </view>
+      <view class="aux-link-item reset-btn" bindtap="resetToPicker">
+        <text class="aux-link-icon">🔄</text>
+        <text>换个视频</text>
       </view>
     </view>
   </view>

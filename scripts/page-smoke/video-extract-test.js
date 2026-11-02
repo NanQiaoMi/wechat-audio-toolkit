@@ -748,6 +748,118 @@ async function runAll() {
     assert.ok(editorJs.indexOf('goVideoExtract') >= 0, 'editor.js 必须实现 goVideoExtract 跳转函数');
   });
 
+  console.log('\n# 5. 视频提取完成页界面重构与纯音频直通剪辑校验');
+
+  it('耗时人性化格式化与作品库自动持久化', () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    global.wx = {
+      showToast: () => {},
+      createInnerAudioContext: () => ({ set src(v) {} }),
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    // 模拟应用云端 14259ms 转码结果
+    page.applyExtractionResult({
+      title: '电影原声片段',
+      format: 'mp3',
+      duration: 132,
+      size: 3.1 * 1024 * 1024,
+      tempFilePath: 'wxfile://tmp/movie.mp3',
+      fileID: 'cloud://test/movie.mp3',
+      mode: 'cloud',
+      costMs: 14259,
+    });
+
+    assert.strictEqual(page.data.status, 'success');
+    assert.strictEqual(page.data.extractCostText, '14.3s', '14259ms 必须格式化为 14.3s');
+    assert.ok(page.data.speedDescText.indexOf('14.3s') >= 0, 'speedDescText 必须包含 14.3s 而非生硬 ms');
+    assert.strictEqual(page.data.isSavedToLibrary, true, '提取成功必须自动沉淀至作品库');
+
+    // 检查本地 < 1000ms 格式化
+    page.applyExtractionResult({
+      title: '短视频',
+      format: 'm4a',
+      duration: 15,
+      size: 300 * 1024,
+      tempFilePath: 'wxfile://tmp/short.m4a',
+      fileID: '',
+      mode: 'local',
+      costMs: 680,
+    });
+    assert.strictEqual(page.data.extractCostText, '680ms', '小耗时保留 ms 格式');
+  });
+
+  it('saveToLocalDisk: 手机端调用 shareFileMessage 转发，PC 端调用 saveFileToDisk', () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let shareFileCalled = false;
+    let saveDiskCalled = false;
+
+    // 1. 模拟手机环境
+    global.wx = {
+      getSystemInfoSync: () => ({ platform: 'ios' }),
+      shareFileMessage: (opts) => { shareFileCalled = true; opts.success(); },
+      showToast: () => {},
+      createInnerAudioContext: () => ({ set src(v) {} }),
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+    page.data.resultAudio = {
+      title: '我的音频',
+      format: 'mp3',
+      tempFilePath: 'wxfile://tmp/audio.mp3',
+    };
+
+    page.saveToLocalDisk();
+    assert.strictEqual(shareFileCalled, true, '手机端应触发 shareFileMessage');
+
+    // 2. 模拟 PC 环境
+    global.wx = {
+      getSystemInfoSync: () => ({ platform: 'mac' }),
+      saveFileToDisk: (opts) => { saveDiskCalled = true; opts.success(); },
+      showToast: () => {},
+      createInnerAudioContext: () => ({ set src(v) {} }),
+    };
+    page.saveToLocalDisk();
+    assert.strictEqual(saveDiskCalled, true, 'PC 端应触发 saveFileToDisk');
+  });
+
+  it('video-extract.wxml & wxss 布局契约验证：主行动送入剪辑、次级双列操作与格式转换卡片', () => {
+    const wxml = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/video-extract/video-extract.wxml'), 'utf8');
+    const wxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/video-extract/video-extract.wxss'), 'utf8');
+
+    // 验证废除 2x2 网格
+    assert.strictEqual(wxml.indexOf('next-actions-grid'), -1, '必须彻底移除旧的 2x2 网格 next-actions-grid');
+
+    // 验证包含新的层级布局元素
+    assert.ok(wxml.indexOf('primary-editor') >= 0, 'wxml 必须包含主行动 primary-editor');
+    assert.ok(wxml.indexOf('sub-export-row') >= 0, 'wxml 必须包含次级双列 sub-export-row');
+    assert.ok(wxml.indexOf('primary-share') >= 0, 'wxml 必须包含发给微信好友 primary-share');
+    assert.ok(wxml.indexOf('secondary-save') >= 0, 'wxml 必须包含保存至手机 secondary-save');
+    assert.ok(wxml.indexOf('converter-utility-card') >= 0, 'wxml 必须包含转格式卡片 converter-utility-card');
+    assert.ok(wxml.indexOf('aux-links-row') >= 0, 'wxml 必须包含底部辅助链接 aux-links-row');
+
+    // 验证样式表包含关键样式
+    assert.ok(wxss.indexOf('.export-btn.primary-editor') >= 0, 'wxss 必须定义 primary-editor');
+    assert.ok(wxss.indexOf('.sub-export-row') >= 0, 'wxss 必须定义 sub-export-row');
+    assert.ok(wxss.indexOf('.converter-utility-card') >= 0, 'wxss 必须定义 converter-utility-card');
+    assert.ok(wxss.indexOf('.aux-links-row') >= 0, 'wxss 必须定义 aux-links-row');
+  });
+
   console.log('\n============================================');
   console.log(`视频提取测试套件: pass=${passedCount} fail=${totalCount - passedCount}`);
   if (passedCount === totalCount) {
