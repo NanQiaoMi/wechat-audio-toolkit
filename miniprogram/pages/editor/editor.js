@@ -113,10 +113,12 @@ Page({
     pinchTipText: '',
     userBrowsingWhilePlaying: false, // 播放时用户主动滑阅后续内容状态标记
 
-    // 通用多音轨与声音工具
+    // 通用多音轨与声音工具（默认初始化 4 轨，最多支持 8 轨专业混音）
     tracks: [
       { id: 'T1', name: '音轨 1', color: '#3B82F6', tag: '1', mute: false, solo: false, volumeDb: 0 },
       { id: 'T2', name: '音轨 2', color: '#10B981', tag: '2', mute: false, solo: false, volumeDb: 0 },
+      { id: 'T3', name: '音轨 3', color: '#F59E0B', tag: '3', mute: false, solo: false, volumeDb: 0 },
+      { id: 'T4', name: '音轨 4', color: '#8B5CF6', tag: '4', mute: false, solo: false, volumeDb: 0 },
     ],
     trackViews: [],
     activeTool: 'select', // 'select' (V) | 'razor' (C)
@@ -188,6 +190,8 @@ Page({
     this.tracks = [
       { id: 'T1', name: '音轨 1', color: '#3B82F6', tag: '1', mute: false, solo: false, volumeDb: 0 },
       { id: 'T2', name: '音轨 2', color: '#10B981', tag: '2', mute: false, solo: false, volumeDb: 0 },
+      { id: 'T3', name: '音轨 3', color: '#F59E0B', tag: '3', mute: false, solo: false, volumeDb: 0 },
+      { id: 'T4', name: '音轨 4', color: '#8B5CF6', tag: '4', mute: false, solo: false, volumeDb: 0 },
     ];
     this._targetTrackId = 'T1';
     this.sources = [];
@@ -1839,13 +1843,13 @@ Page({
 
   addTrack() {
     if (!this.tracks) this.tracks = [];
-    if (this.tracks.length >= 6) {
-      wx.showToast({ title: '最多支持 6 条音轨', icon: 'none' });
+    if (this.tracks.length >= 8) {
+      wx.showToast({ title: '最多支持 8 条音轨', icon: 'none' });
       return;
     }
     this.pushUndo();
     const nextNum = this.tracks.length + 1;
-    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+    const colors = editorUtils.TRACK_COLORS || ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#E11D48', '#84CC16'];
     const color = colors[(nextNum - 1) % colors.length];
     const newTrack = {
       id: 'T' + nextNum + '_' + Date.now().toString(36).slice(-4),
@@ -1859,7 +1863,8 @@ Page({
     this.tracks.push(newTrack);
     this._targetTrackId = newTrack.id;
     this.refreshClipData();
-    wx.showToast({ title: '已新建「' + newTrack.name + '」', icon: 'none' });
+    haptics.impactLight();
+    wx.showToast({ title: `已创建「${newTrack.name}」`, icon: 'none' });
   },
 
   deleteTrack(e) {
@@ -2867,11 +2872,35 @@ Page({
     const clip = this.getSelectedClip();
     if (!clip) return;
     this.pushUndo();
-    this.stopPlaybackAudioOnly();
-    this.playback = null;
-    this.paused = false;
+
+    // 更新片段倍速
     this.clips[this.selectedClipIndex].speed = val;
+
+    // 若当前正在播放，热更新播放速率，平滑过渡而不中断或倒退至开头！
+    if (this.data.isPlaying) {
+      this._playbackSpeed = val;
+      if (this.sourceAudio && typeof this.sourceAudio.playbackRate !== 'undefined') {
+        try { this.sourceAudio.playbackRate = val; } catch (e) {}
+      }
+      if (this.trackAudioPool) {
+        Object.keys(this.trackAudioPool).forEach(id => {
+          const a = this.trackAudioPool[id];
+          if (a && typeof a.playbackRate !== 'undefined') {
+            try { a.playbackRate = val; } catch (e) {}
+          }
+        });
+      }
+      if (this.playback && this.playback.queue && this.playback.queue[this.playback.index]) {
+        this.playback.queue[this.playback.index].speed = val;
+      }
+      // 重置高精物理时钟锚点，保持当前播放时码连续无突跳
+      this._playbackWallStart = Date.now();
+      this._playbackStartSourceTime = this.currentSourceTime;
+      this._playbackStartTimelineSec = this.data.currentTimelineSec;
+    }
+
     this.refreshClipData();
+    haptics.impactLight();
     wx.showToast({ title: `变速已设为 ${val}x`, icon: 'none' });
   },
 
@@ -3144,7 +3173,8 @@ Page({
         if (activeClip) {
           const src = sourceMap[activeClip.sourceId];
           if (!src || !src.localPath) return;
-          const sourceOffset = editorUtils.round3(activeClip.in + (targetSec - activeClip.timelineStartSec));
+          const speed = activeClip.speed || 1.0;
+          const sourceOffset = editorUtils.round3(activeClip.in + (targetSec - activeClip.timelineStartSec) * speed);
           this.activeTrackClips[track.id] = { clipId: activeClip.id, sourceOffset: sourceOffset };
           try {
             audio.startTime = sourceOffset;
@@ -3566,8 +3596,9 @@ Page({
         const src = sourceMap[activeClip.sourceId];
         if (!src || !src.localPath) return;
 
-        // 计算该片段此刻应处的源时间偏移
-        const sourceOffset = editorUtils.round3(activeClip.in + (currentTimelineSec - activeClip.timelineStartSec));
+        const speed = activeClip.speed || 1.0;
+        // 计算该片段此刻应处的源时间偏移（倍速补偿）
+        const sourceOffset = editorUtils.round3(activeClip.in + (currentTimelineSec - activeClip.timelineStartSec) * speed);
         // 计算音量包络（轨道音量 + 片段音量 + 全局音量 + 淡入淡出）
         let vol = editorUtils.dbToGain(track.volumeDb || 0) * editorUtils.dbToGain(activeClip.volumeDb || 0) * editorUtils.dbToGain(this.data.volumeDb || 0);
         // 智能人声避让 (Auto-Ducking)：遇其他轨道人声时自动下压 -12dB

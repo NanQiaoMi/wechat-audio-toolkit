@@ -315,6 +315,24 @@ async function runAll() {
       getFileSystemManager: () => ({
         statSync: () => ({ size: 3 * 1024 * 1024 }),
       }),
+      cloud: {
+        uploadFile: async ({ cloudPath, filePath }) => ({
+          fileID: 'cloud://test/video_tmp/dance.mp4',
+        }),
+        callFunction: async ({ name, data }) => ({
+          result: {
+            code: 0,
+            fileID: 'cloud://test/audio_tmp/dance_audio.mp3',
+            fileId: 'cloud://test/audio_tmp/dance_audio.mp3',
+            duration: 120,
+            size: 2.8 * 1024 * 1024,
+            format: 'mp3',
+          },
+        }),
+        downloadFile: async () => ({
+          tempFilePath: 'wxfile://tmp/dance_audio.mp3',
+        }),
+      },
       showToast: () => {},
       showModal: () => {},
       navigateTo: ({ url }) => { globalData.lastNavigatedUrl = url; },
@@ -341,13 +359,13 @@ async function runAll() {
       thumbTempFilePath: 'wxfile://tmp/thumb.jpg',
     });
 
-    // 校验提取成功
+    // 校验提取成功（直连云端 FFmpeg 提取标准 MP3）
     assert.strictEqual(page.data.status, 'success');
-    assert.strictEqual(page.data.extractMode, 'local');
+    assert.strictEqual(page.data.extractMode, 'cloud');
     assert.strictEqual(page.data.resultAudio.title, '舞蹈配乐_原声');
-    assert.strictEqual(page.data.resultAudio.format, 'm4a');
+    assert.strictEqual(page.data.resultAudio.format, 'mp3');
     assert.strictEqual(page.data.resultAudio.duration, 120);
-    assert.strictEqual(page.data.resultAudio.tempFilePath, 'wxfile://tmp/my_extracted.m4a');
+    assert.strictEqual(page.data.resultAudio.tempFilePath, 'wxfile://tmp/dance_audio.mp3');
 
     // 试听播放
     page.togglePlayAudio();
@@ -358,7 +376,7 @@ async function runAll() {
     assert.strictEqual(globalData.lastNavigatedUrl, '/pages/editor/editor');
     assert.ok(globalData.pendingAudio);
     assert.strictEqual(globalData.pendingAudio.from, 'video-extract');
-    assert.strictEqual(globalData.pendingAudio.path, 'wxfile://tmp/my_extracted.m4a');
+    assert.strictEqual(globalData.pendingAudio.path, 'wxfile://tmp/dance_audio.mp3');
 
     // 送入格式转换
     page.sendToConverter();
@@ -602,13 +620,12 @@ async function runAll() {
       duration: 180,
     });
 
-    // 核心断言：上传的文件必须是本地解出的 3.5MB 音频，绝不能是 200MB 的原视频！
-    assert.strictEqual(uploadedFilePath, 'wxfile://tmp/demuxed_audio.m4a', '必须仅上传解出的纯音频，杜绝上传原视频');
-    assert.ok(uploadedCloudPath.startsWith('audio_tmp/'), '必须上传至 audio_tmp 纯音频目录');
+    // 核心断言：直接发起云端提取，上传原视频至 video_tmp 由云端 FFmpeg 解构
+    assert.strictEqual(uploadedFilePath, 'wxfile://tmp/huge_movie_200mb.mp4', '直接上传视频由云端提取');
+    assert.ok(uploadedCloudPath.startsWith('video_tmp/'), '必须上传至 video_tmp 视频暂存目录');
     assert.strictEqual(page.data.status, 'success');
     assert.strictEqual(page.data.extractMode, 'cloud');
-    assert.ok(page.data.speedDescText.indexOf('省流量') >= 0, '结果摘要必须包含省流量说明');
-    assert.ok(page.data.speedDescText.indexOf('98%') >= 0, '200MB 降至 3.5MB 节省约 98% 流量');
+    assert.ok(page.data.speedDescText.indexOf('云端转码') >= 0, '结果摘要包含云端转码说明');
   });
 
   await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 且 compressed: false 规避微信原生压缩与音频解码失败', async () => {

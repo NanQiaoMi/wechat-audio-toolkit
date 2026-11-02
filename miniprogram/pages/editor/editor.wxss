@@ -14,7 +14,7 @@
 }
 
 .app-container.with-export-bar {
-  padding-bottom: 240rpx;
+  padding-bottom: calc(260rpx + env(safe-area-inset-bottom)) !important;
 }
 
 /* ============================================================
@@ -2258,25 +2258,26 @@ button.zoom-step-btn[disabled] {
   font-family: monospace;
 }
 
-/* 真实声波微缩切片 (Timeline Dense Waveform Slice) */
+/* 真实声波微缩切片 (Timeline Full-Span Dense Waveform Slice，放大后全幅无死角自适应满铺) */
 .clip-wave-bars {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 3rpx;
+  justify-content: space-between;
   height: 48rpx;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 4rpx;
+  padding: 0 6rpx;
   overflow: hidden;
 }
 
 .cw-bar {
-  flex-shrink: 0;
+  flex: 0 0 3rpx;
   width: 3rpx;
-  min-width: 3rpx;
+  min-width: 2rpx;
+  max-width: 4rpx;
   border-radius: 2rpx;
   background-color: #94A3B8;
+  height: 40%;
 }
 
 .nle-clip-card.selected .cw-bar {
@@ -3575,9 +3576,11 @@ button.nudge-pill-btn:active {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16rpx;
   z-index: 100;
   box-shadow: 0 12rpx 36rpx rgba(28, 25, 23, 0.12), 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
   box-sizing: border-box;
+  overflow: hidden;
   animation: springPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -3726,11 +3729,16 @@ button.nudge-pill-btn:active {
   text-overflow: ellipsis;
 }
 
-/* 右侧：主导出按键 */
+/* 右侧：主导出按键 (强制重置小程序原生 button:not([size='mini']) 的默认尺寸与外边距，杜绝溢出重叠) */
 button.dock-export-action-btn {
+  width: auto !important;
+  margin: 0 !important;
+  max-width: 52% !important;
+  box-sizing: border-box !important;
+  white-space: nowrap;
   background: #1C1917;
   color: #FFFFFF;
-  padding: 20rpx 40rpx;
+  padding: 18rpx 36rpx;
   border-radius: 999rpx;
   font-size: 28rpx;
   font-weight: 800;

@@ -22,12 +22,14 @@ var MIN_SELECTION_DURATION = 0.2; // 选区最短 0.2s
 var MAX_FADE_SEC = 5; // 单片段淡入/淡出上限（与后端一致；UI 只提供 0~3s）
 var FADE_OPTIONS = [0, 0.5, 1, 2, 3]; // 每片段淡入/淡出可选值（秒）
 
-// ---- 纯净通用音轨定义 (Track 1, Track 2...) ----
-var TRACK_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'];
+// ---- 纯净通用音轨定义 (Track 1, Track 2... 支持拓展至 8 轨) ----
+var TRACK_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#E11D48', '#84CC16'];
 
 var TRACK_DEFS = [
   { id: 'T1', name: '音轨 1', color: '#3B82F6', tag: '1' },
   { id: 'T2', name: '音轨 2', color: '#10B981', tag: '2' },
+  { id: 'T3', name: '音轨 3', color: '#F59E0B', tag: '3' },
+  { id: 'T4', name: '音轨 4', color: '#8B5CF6', tag: '4' },
 ];
 
 var SPEED_OPTIONS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
@@ -309,11 +311,15 @@ function clipDuration(clip) {
   return end - start;
 }
 
-/** 成片总时长 = Σ(out-in)。 */
+/** 成片总时长 = Σ((out-in)/speed)。考虑各分段倍速对最终成品总长的真实影响。 */
 function planDuration(clips) {
   var list = Array.isArray(clips) ? clips : [];
   var sum = 0;
-  for (var i = 0; i < list.length; i++) sum += clipDuration(list[i]);
+  for (var i = 0; i < list.length; i++) {
+    var cl = list[i];
+    var sp = cl && cl.speed && cl.speed > 0 ? cl.speed : 1.0;
+    sum += clipDuration(cl) / sp;
+  }
   return sum;
 }
 
@@ -753,7 +759,10 @@ function buildTimelineData(tracks, clips, sources, zoomScale, selectedClipIndex,
     }
 
     var targetTrack = trackMap[tid];
+    var speed = cv.speed && cv.speed > 0 ? cv.speed : 1.0;
     var dur = cv.duration;
+    // 片段在时间轴上的物理占用时长受倍速影响（2x 倍速耗时减半，0.5x 倍速耗时翻倍）
+    var effectiveDur = round3(dur / speed);
     // 紧凑排布或指定偏移
     var startSec = 0;
     if (typeof cv.offsetSec === 'number' && cv.offsetSec > 0) {
@@ -761,21 +770,21 @@ function buildTimelineData(tracks, clips, sources, zoomScale, selectedClipIndex,
     } else {
       startSec = targetTrack.currentTrackEndSec;
     }
-    var endSec = round3(startSec + dur);
+    var endSec = round3(startSec + effectiveDur);
     targetTrack.currentTrackEndSec = endSec;
     if (endSec > maxTimelineSec) {
       maxTimelineSec = endSec;
     }
 
     var minWidthRpx = Math.max(24, Math.min(140, Math.round(140 * scale)));
-    var widthRpx = Math.max(minWidthRpx, Math.round(dur * pxPerSec));
+    var widthRpx = Math.max(minWidthRpx, Math.round(effectiveDur * pxPerSec));
     var leftRpx = Math.round(startSec * pxPerSec);
     var src = sMap[cv.sourceId];
-    // 密集波形：常态每 6rpx 排布一根波形条；双指缩放手势期间自适应轻量化(最高28柱)，保障 60FPS 极速响应与无卡顿
-    var barPitchRpx = 6;
+    // 密集波形：常态自适应满铺，全幅延展无留白；双指缩放手势期间自适应轻量化(最高36柱)，保障 60FPS 极速手势响应
+    var barPitchRpx = 8;
     var dynamicBarCount = isPinching
       ? Math.max(8, Math.min(28, Math.floor(widthRpx / 16)))
-      : Math.max(8, Math.min(320, Math.floor(widthRpx / barPitchRpx)));
+      : Math.max(20, Math.min(360, Math.floor(widthRpx / barPitchRpx)));
     var dynamicWaveBars = sliceClipWaveBars(src, cv.in, cv.out, dynamicBarCount);
 
     var item = Object.assign({}, cv, {
@@ -783,6 +792,8 @@ function buildTimelineData(tracks, clips, sources, zoomScale, selectedClipIndex,
       trackColor: targetTrack.color,
       timelineStartSec: startSec,
       timelineEndSec: endSec,
+      effectiveDuration: effectiveDur,
+      effectiveDurationText: formatPrecise(effectiveDur),
       widthRpx: widthRpx,
       leftRpx: leftRpx,
       isSelected: selectedClipIndex === c,
@@ -921,10 +932,12 @@ function shiftOverlappingClipsToNextTrack(tracks, clips) {
         for (var j = i + 1; j < laneClips.length; j++) {
           var itemA = laneClips[i];
           var itemB = laneClips[j];
+          var spA = itemA.clip && itemA.clip.speed && itemA.clip.speed > 0 ? itemA.clip.speed : 1.0;
+          var spB = itemB.clip && itemB.clip.speed && itemB.clip.speed > 0 ? itemB.clip.speed : 1.0;
           var startA = toNonNegative(itemA.clip.offsetSec);
-          var endA = round3(startA + clipDuration(itemA.clip));
+          var endA = round3(startA + clipDuration(itemA.clip) / spA);
           var startB = toNonNegative(itemB.clip.offsetSec);
-          var endB = round3(startB + clipDuration(itemB.clip));
+          var endB = round3(startB + clipDuration(itemB.clip) / spB);
 
           var overlapStart = Math.max(startA, startB);
           var overlapEnd = Math.min(endA, endB);
@@ -947,8 +960,9 @@ function shiftOverlappingClipsToNextTrack(tracks, clips) {
               var hasConflict = false;
               for (var k = 0; k < candClips.length; k++) {
                 var oc = candClips[k];
+                var ocSp = oc && oc.speed && oc.speed > 0 ? oc.speed : 1.0;
                 var ocStart = toNonNegative(oc.offsetSec);
-                var ocEnd = round3(ocStart + clipDuration(oc));
+                var ocEnd = round3(ocStart + clipDuration(oc) / ocSp);
                 if (Math.max(startB, ocStart) < Math.min(endB, ocEnd) - 0.05) {
                   hasConflict = true;
                   break;
@@ -960,9 +974,9 @@ function shiftOverlappingClipsToNextTrack(tracks, clips) {
               }
             }
 
-            // 若现有下一轨均有冲突或没有下一轨，则自动新建下一条音轨（最多6条）
+            // 若现有下一轨均有冲突或没有下一轨，则自动新建下一条音轨（最多支持8条音轨）
             if (!targetTrackId) {
-              if (trackList.length < 6) {
+              if (trackList.length < 8) {
                 var nextNum = trackList.length + 1;
                 var newTrk = {
                   id: 'T' + nextNum,
@@ -1061,6 +1075,8 @@ function buildPreviewQueue(clips, sources, options) {
       return { ok: false, queue: [], message: '存在过短的片段（<0.2 秒），请先调整。' };
     }
     var fades = effectiveClipFades(clip);
+    var speed = clip && clip.speed && clip.speed > 0 ? clip.speed : 1.0;
+    var effectiveDur = round3(dur / speed);
     queue.push({
       clipId: clip.id,
       clipIndex: index,
@@ -1070,27 +1086,33 @@ function buildPreviewQueue(clips, sources, options) {
       in: round3(clip.in),
       out: round3(clip.out),
       duration: round3(dur),
+      effectiveDuration: effectiveDur,
       fadeIn: round3(fades.fadeIn),
       fadeOut: round3(fades.fadeOut),
       offset: round3(offset),
-      speed: clip.speed || 1.0,
+      speed: speed,
       volumeDb: typeof clip.volumeDb === 'number' ? clip.volumeDb : 0,
       eqPreset: clip.eqPreset || 'flat',
       denoise: clip.denoise || 0,
     });
-    offset += dur;
+    offset += effectiveDur;
   }
   return { ok: true, queue: queue, total: round3(offset) };
 }
 
-/** 当前播放位置（源时间）换算成成片时间轴位置（用于展示/淡入淡出）。 */
+/** 当前播放位置（源时间）换算成成片时间轴位置（用于展示/淡入淡出，高精换算倍速物理时钟）。 */
 function queueOutputPosition(queue, index, sourceTime) {
   var list = Array.isArray(queue) ? queue : [];
   if (!list.length) return 0;
   var i = Math.max(0, Math.min(toNumber(index, 0), list.length - 1));
   var item = list[i];
   var pos = toNumber(item.offset, 0);
-  var local = clampNumber(toNumber(sourceTime, 0) - toNumber(item.in, 0), 0, Math.max(0, toNumber(item.out, 0) - toNumber(item.in, 0)));
+  var speed = item.speed && item.speed > 0 ? item.speed : 1.0;
+  var inSec = toNumber(item.in, 0);
+  var outSec = toNumber(item.out, 0);
+  var rawLocal = toNumber(sourceTime, 0) - inSec;
+  var maxLocal = Math.max(0, outSec - inSec);
+  var local = clampNumber(rawLocal / speed, 0, maxLocal / speed);
   return pos + local;
 }
 
