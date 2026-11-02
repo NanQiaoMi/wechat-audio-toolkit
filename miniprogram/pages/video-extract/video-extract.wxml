@@ -95,6 +95,7 @@
           <text class="tag-capsule format">{{resultAudio.formatUpper}}</text>
           <text class="tag-capsule dur">{{resultAudio.durationText}}</text>
           <text class="tag-capsule size">{{resultAudio.sizeText}}</text>
+          <text wx:if="{{extractMode === 'local'}}" class="tag-capsule cloud-convert-pill" bindtap="reExtractViaCloud" hover-class="tag-hover">☁️ 转为标准MP3</text>
         </view>
       </view>
     </view>
