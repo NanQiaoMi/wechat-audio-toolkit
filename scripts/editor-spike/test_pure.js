@@ -491,6 +491,16 @@ const muteTrackPlan = {
 const muteGraph = core.buildFilterGraphV2(muteTrackPlan)
 check('多轨静音：T2 被静音后排除出混音', muteGraph.indexOf('trk_T2') < 0 && muteGraph.indexOf('[trk_T1]anull[cat]') >= 0)
 
+// 风格 EQ: 温暖黑胶 (warm)
+const warmPlan = {
+  sources: [{ fileID: 'c1' }],
+  clips: [{ sourceIndex: 0, in: 0, out: 5, eqPreset: 'warm' }],
+  tracks: [{ id: 'T1' }],
+  volumeDb: 0
+}
+const warmGraph = core.buildFilterGraphV2(warmPlan)
+check('风格EQ：包含 warm 温暖黑胶均衡器参数', warmGraph.indexOf('equalizer=f=350:width_type=h:width=250:g=3,lowpass=f=12000') >= 0)
+
 // ===========================================================================
 console.log('\n# haptics: 全局触感反馈引擎与防抖节流')
 const haptics = require('../../miniprogram/utils/haptics.js')
@@ -538,6 +548,8 @@ delete global.wx
 // ===========================================================================
 console.log('\n# editorUtils: 时间轴自适应标尺密度与全景毕业')
 const editorUtils = require('../../miniprogram/utils/editor-utils.js')
+eq('EQ_PRESETS 包含 6 种对称预设', editorUtils.EQ_PRESETS.length, 6)
+check('EQ_PRESETS 包含 warm 温暖黑胶', editorUtils.getEqPreset('warm').label === '温暖黑胶')
 
 // 1. 10 分钟超长全景全景测试 (pxPerSec = 1.5, maxTimelineSec = 600)
 const longTrackList = [{ id: 'T1', name: 'A1' }]

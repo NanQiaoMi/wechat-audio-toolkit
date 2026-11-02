@@ -3084,10 +3084,74 @@ button.zoom-step-btn[disabled] {
 .chips-selector-row {
   display: flex;
   gap: 10rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chips-selector-row.wrap {
   flex-wrap: wrap;
+}
+
+/* 速度选择网格：3列 x 2行 对称排版，防出界，大触控区 */
+.chips-selector-row.speed-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 12rpx !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.chips-selector-row.speed-grid .sel-chip {
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 16rpx 6rpx !important;
+  font-size: 24rpx !important;
+}
+
+/* 声音均衡器网格：3列 x 2行 对称排版，6种经典预设，杜绝单项孤儿换行 */
+.chips-selector-row.eq-grid,
+.chips-selector-row.wrap.eq-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 12rpx !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.chips-selector-row.eq-grid .sel-chip,
+.chips-selector-row.wrap.eq-grid .sel-chip {
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 16rpx 6rpx !important;
+  font-size: 22rpx !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6rpx !important;
+  white-space: nowrap !important;
+}
+
+/* 降噪梯度网格：4列严格均分 */
+.chips-selector-row.denoise-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 10rpx !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.chips-selector-row.denoise-grid .sel-chip {
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 16rpx 4rpx !important;
+  font-size: 21rpx !important;
+  white-space: nowrap !important;
 }
 
 .sel-chip {
@@ -4289,6 +4353,13 @@ button.dialog-btn.agree {
   min-width: 100%;
   gap: 10rpx;
   box-sizing: border-box;
+}
+
+.drawer-tabs-scroll .inspector-tab-bar .tab-chip {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  padding: 12rpx 24rpx !important;
+  font-size: 24rpx !important;
 }
 
 .drawer-scroll-body {

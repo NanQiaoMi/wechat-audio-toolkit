@@ -765,7 +765,7 @@
             <text class="section-title">⚡ 播放速度与节奏</text>
             <text class="section-val">{{selectedClipSpeed}}x 倍速</text>
           </view>
-          <view class="chips-selector-row">
+          <view class="chips-selector-row speed-grid">
             <view
               wx:for="{{speedOptions}}"
               wx:key="*this"
@@ -784,7 +784,7 @@
             <text class="section-title">🎙️ 声音均衡器 (EQ 预设)</text>
             <text class="section-val">{{selectedClip.eqLabel || '原声'}}</text>
           </view>
-          <view class="chips-selector-row wrap">
+          <view class="chips-selector-row wrap eq-grid">
             <view
               wx:for="{{eqPresets}}"
               wx:key="key"
@@ -804,7 +804,7 @@
             <text class="section-title">🔇 智能降噪消除底噪</text>
             <text class="section-val">{{selectedClipDenoise ? selectedClipDenoise + ' dB' : '未开启'}}</text>
           </view>
-          <view class="chips-selector-row">
+          <view class="chips-selector-row denoise-grid">
             <view
               wx:for="{{denoiseOptions}}"
               wx:key="val"
@@ -969,7 +969,7 @@
                 <text class="section-title">⚡ 播放速度与节奏</text>
                 <text class="section-val highlight">{{selectedClipSpeed}}x 倍速</text>
               </view>
-              <view class="chips-selector-row">
+              <view class="chips-selector-row speed-grid">
                 <view
                   wx:for="{{speedOptions}}"
                   wx:key="*this"
@@ -1017,7 +1017,7 @@
                 <text class="section-title">🎙️ 声音均衡器 (EQ 预设)</text>
                 <text class="section-val highlight">{{selectedClip.eqLabel || '原声无染'}}</text>
               </view>
-              <view class="chips-selector-row wrap">
+              <view class="chips-selector-row wrap eq-grid">
                 <view
                   wx:for="{{eqPresets}}"
                   wx:key="key"
@@ -1040,7 +1040,7 @@
                 <text class="section-title">🔇 智能降噪消除底噪</text>
                 <text class="section-val highlight">{{selectedClipDenoise ? selectedClipDenoise + ' dB' : '未开启'}}</text>
               </view>
-              <view class="chips-selector-row">
+              <view class="chips-selector-row denoise-grid">
                 <view
                   wx:for="{{denoiseOptions}}"
                   wx:key="val"

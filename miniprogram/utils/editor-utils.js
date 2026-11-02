@@ -39,7 +39,8 @@ var EQ_PRESETS = [
   { key: 'vocal', label: '清晰人声', icon: '🎙️', desc: '提亮 1~3kHz 中频，切除浑浊低频' },
   { key: 'radio', label: '复古电台', icon: '📻', desc: '带通滤波模拟经典收音机与老电话' },
   { key: 'bass', label: '澎湃低音', icon: '🎧', desc: '增强 80~120Hz 律动与低频厚度' },
-  { key: 'treble', label: '明亮空气', icon: '✨', desc: '提升 6~10kHz 高频，清脆通透' }
+  { key: 'treble', label: '明亮空气', icon: '✨', desc: '提升 6~10kHz 高频，清脆通透' },
+  { key: 'warm', label: '温暖黑胶', icon: '💿', desc: '提升温暖中低频，抚平高频毛刺与燥感' }
 ];
 
 var DENOISE_OPTIONS = [

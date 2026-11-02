@@ -1702,10 +1702,9 @@ smokeTest('音频修改后试听与成片重渲染防护：startTime/playbackRat
   assert.strictEqual(page.sourceAudio.startTime, 10, 'InnerAudioContext.startTime 必须显式设为 clip.in (10s)');
   assert.strictEqual(page.sourceAudio.playbackRate, 1.5, 'InnerAudioContext.playbackRate 必须设为 clip.speed (1.5)');
 
-  // 4. 验证 applyPreviewVolume 计算了 clip.volumeDb
+  // 4. 验证 applyPreviewVolume 计算了 clip.volumeDb（实时热调音更新）
   page.onClipGainChange({ detail: { value: -6 } });
-  assert.strictEqual(page.playback, null, '调节增益应使旧播放队列失效');
-  await page.startPlayback('clip');
+  assert.strictEqual(page.playback.queue[0].volumeDb, -6, '调节增益应热更新播放队列中的 volumeDb，绝不中断正在进行的播放');
   page.applyPreviewVolume(15);
   assert.ok(page.sourceAudio.volume < 0.6 && page.sourceAudio.volume > 0.4, '音量应应用片段增益 -6dB');
 
@@ -2379,6 +2378,76 @@ smokeTest('v6.6 倍速动态平滑切换、多轨8轨扩容、全幅波形图无
   assert.ok(editorWxss.includes('dock-export-action-btn'), '必须包含 dock-export-action-btn 导出按钮样式');
   assert.ok(editorWxss.includes('max-width: 52% !important'), '导出按钮必须限制 max-width 避免覆盖左侧时码');
   assert.ok(editorWxss.includes('width: auto !important'), '导出按钮必须显式强制重置原生宽度');
+
+  page.onUnload();
+});
+
+smokeTest('声音工具箱非破坏性实时音效调节与均衡器/变速网格布局美化 (v6.7)', async () => {
+  const stub = createWxStub({
+    chooseBatches: [
+      [{ path: 'wxfile://tmp/song.mp3', name: 'song.mp3', size: 1024 * 1024 }],
+    ],
+    analyzeResults: [
+      makeAnalyzeResponse({ duration: 180, format: 'mp3', playableIos: true, playableAndroid: true }),
+    ],
+  });
+  const page = loadEditorPage(stub.wx);
+  page.onLoad();
+  page.onShow();
+
+  page.chooseAudioFiles();
+  await wait(80);
+  assert.strictEqual(page.data.status, 'editing');
+
+  // 1. 验证 EQ 预设 6 项完整度与倍速选项 6 项完整度
+  assert.strictEqual(page.data.eqPresets.length, 6, 'EQ 预设应包含 6 种预设');
+  assert.strictEqual(page.data.speedOptions.length, 6, '倍速应包含 6 种标准速度');
+
+  // 2. 启动播放并在播放中动态切换 EQ 预设
+  page.togglePlayClip();
+  assert.strictEqual(page.data.isPlaying, true, '播放应已开启');
+  page.currentSourceTime = 42.5;
+
+  page.setClipEq({ currentTarget: { dataset: { preset: 'warm' } } });
+  assert.strictEqual(page.data.isPlaying, true, '动态设置 EQ 时必须保持播放，绝不可中断');
+  assert.strictEqual(page.currentSourceTime, 42.5, '当前播放指针必须保持 42.5s');
+  assert.strictEqual(page.clips[0].eqPreset, 'warm', '片段 eqPreset 应更新为 warm');
+  assert.strictEqual(page.playback.queue[0].eqPreset, 'warm', '播放队列 eqPreset 应同步更新');
+
+  // 3. 动态切换降噪
+  page.setClipDenoise({ currentTarget: { dataset: { value: 6 } } });
+  assert.strictEqual(page.data.isPlaying, true, '动态设置降噪时必须保持播放');
+  assert.strictEqual(page.currentSourceTime, 42.5, '当前播放指针必须保持');
+  assert.strictEqual(page.clips[0].denoise, 6, '片段 denoise 应更新为 6');
+  assert.strictEqual(page.playback.queue[0].denoise, 6, '播放队列 denoise 应同步更新');
+
+  // 4. 动态滑动片段音量增益
+  page.onClipGainChanging({ detail: { value: 5 } });
+  assert.strictEqual(page.clips[0].volumeDb, 5, '滑动中片段音量应实时响应');
+  assert.strictEqual(page.data.isPlaying, true, '滑动中播放必须持续');
+
+  page.onClipGainChange({ detail: { value: 3 } });
+  assert.strictEqual(page.data.isPlaying, true, '松开手势后播放必须持续');
+  assert.strictEqual(page.currentSourceTime, 42.5, '当前播放指针必须保持');
+  assert.strictEqual(page.clips[0].volumeDb, 3, '片段音量增益应更新为 3');
+
+  // 5. 复位音量
+  page.resetClipGain();
+  assert.strictEqual(page.data.isPlaying, true, '复位音量后播放必须持续');
+  assert.strictEqual(page.clips[0].volumeDb, 0, '片段音量增益应复位为 0');
+
+  // 6. 淡入淡出调整时不中断播放且保留片段倍速等其他所有参数
+  page.clips[0].speed = 1.25;
+  page.applyClipFade('fadeIn', 1.5);
+  assert.strictEqual(page.data.isPlaying, true, '调整淡入时保持播放');
+  assert.strictEqual(page.clips[0].fadeIn, 1.5);
+  assert.strictEqual(page.clips[0].speed, 1.25, '调整淡入时绝不可丢失已设置的倍速参数');
+
+  // 7. 验证 CSS 契约：3列网格与对称排版
+  const editorWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/editor/editor.wxss'), 'utf-8');
+  assert.ok(editorWxss.includes('.chips-selector-row.speed-grid'), '必须包含 speed-grid 样式');
+  assert.ok(editorWxss.includes('.chips-selector-row.eq-grid'), '必须包含 eq-grid 样式');
+  assert.ok(editorWxss.includes('.chips-selector-row.denoise-grid'), '必须包含 denoise-grid 样式');
 
   page.onUnload();
 });
