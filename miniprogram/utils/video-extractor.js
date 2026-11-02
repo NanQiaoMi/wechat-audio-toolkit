@@ -180,12 +180,27 @@ function extractAudioLocally(videoFilePath, options = {}) {
                 return;
               }
 
+              // 尝试将导出文件规范化为标准 .m4a 扩展名，确保 InnerAudioContext 识别为纯音频，杜绝视频容器解码异常
+              let safeAudioPath = tempFilePath;
+              try {
+                if (typeof wx.getFileSystemManager === 'function' && wx.env && wx.env.USER_DATA_PATH) {
+                  const fs = wx.getFileSystemManager();
+                  const targetM4aPath = `${wx.env.USER_DATA_PATH}/extracted_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.m4a`;
+                  try {
+                    fs.copyFileSync(tempFilePath, targetM4aPath);
+                    if (fs.existsSync(targetM4aPath)) {
+                      safeAudioPath = targetM4aPath;
+                    }
+                  } catch (copyErr) {}
+                }
+              } catch (fsErr) {}
+
               // 尝试读取导出音频的真实大小
               let actualSize = 0;
               try {
                 if (typeof wx.getFileSystemManager === 'function') {
                   const fs = wx.getFileSystemManager();
-                  const stat = fs.statSync(tempFilePath);
+                  const stat = fs.statSync(safeAudioPath);
                   actualSize = stat ? (stat.size || 0) : 0;
                 }
               } catch (statErr) {}
@@ -194,7 +209,7 @@ function extractAudioLocally(videoFilePath, options = {}) {
               resolve({
                 success: true,
                 mode: 'local',
-                tempFilePath,
+                tempFilePath: safeAudioPath,
                 duration: trackDur,
                 size: actualSize,
                 format: 'm4a',

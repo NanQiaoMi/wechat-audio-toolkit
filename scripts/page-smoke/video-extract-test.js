@@ -312,7 +312,7 @@ async function runAll() {
     assert.strictEqual(page.data.status, 'idle');
   });
 
-  await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 规避微信原生压缩与音频解码失败', async () => {
+  await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 且 compressed: false 规避微信原生压缩与音频解码失败', async () => {
     let capturedOpts = null;
     let pageConfig = null;
     global.Page = (cfg) => { pageConfig = cfg; };
@@ -335,7 +335,9 @@ async function runAll() {
     page.chooseAlbumVideo();
     assert.ok(capturedOpts, 'wx.chooseMedia 必须被调用');
     assert.deepStrictEqual(capturedOpts.sizeType, ['original'], 'sizeType 必须强制为 original 以绕过原生压缩');
+    assert.strictEqual(capturedOpts.compressed, false, 'compressed 必须显式为 false');
     assert.deepStrictEqual(capturedOpts.mediaType, ['video']);
+    assert.deepStrictEqual(capturedOpts.sourceType, ['album']);
   });
 
   await itAsync('chooseAlbumVideo: 降级 wx.chooseVideo 强制传入 compressed: false 规避原生压缩', async () => {
@@ -364,20 +366,25 @@ async function runAll() {
     assert.strictEqual(capturedVideoOpts.compressed, false, 'compressed 必须为 false 禁用压缩');
   });
 
-  await itAsync('chooseAlbumVideo: 捕获微信相册原生解码/压缩错误并提供友好弹窗指引', async () => {
+  await itAsync('chooseAlbumVideo: 捕获微信相册原生解码/压缩错误并提供友好弹窗指引且可一键转入聊天选取', async () => {
     let modalShown = null;
     let pageConfig = null;
     global.Page = (cfg) => { pageConfig = cfg; };
     delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
     require('../../miniprogram/pages/video-extract/video-extract.js');
 
+    let messageFileCalled = false;
     global.wx = {
       chooseMedia: (opts) => {
         opts.fail({ errMsg: 'chooseMedia:fail audio decode error' });
       },
+      chooseMessageFile: (opts) => {
+        messageFileCalled = true;
+      },
       showToast: () => {},
       showModal: (modal) => {
         modalShown = modal;
+        modal.success({ confirm: true });
       },
     };
 
@@ -388,8 +395,33 @@ async function runAll() {
 
     page.chooseAlbumVideo();
     assert.ok(modalShown, '必须弹出友好指导弹窗');
-    assert.strictEqual(modalShown.title, '相册视频读取异常');
-    assert.ok(modalShown.content.indexOf('聊天会话') >= 0);
+    assert.strictEqual(modalShown.title, '相册转码受限');
+    assert.ok(modalShown.content.indexOf('从聊天会话选取') >= 0);
+    assert.strictEqual(messageFileCalled, true, '确认转入聊天选取必须调用 chooseMessageFile');
+  });
+
+  await itAsync('chooseMessageVideo: 采用 type: all 兼容视频与文件形式，彻底绕过相册压缩', async () => {
+    let capturedMessageOpts = null;
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    global.wx = {
+      chooseMessageFile: (opts) => {
+        capturedMessageOpts = opts;
+      },
+      showToast: () => {},
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.chooseMessageVideo();
+    assert.ok(capturedMessageOpts, 'wx.chooseMessageFile 必须被调用');
+    assert.strictEqual(capturedMessageOpts.type, 'all', 'type 必须为 all 兼容原文件与视频');
   });
 
   it('videoExtractor.MAX_CLOUD_VIDEO_BYTES: 同步放宽至 500MB', () => {
