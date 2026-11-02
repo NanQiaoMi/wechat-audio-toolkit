@@ -1366,16 +1366,18 @@ Page({
       return false;
     }
     if (opts.pushUndo !== false) this.pushUndo();
-    this.stopPlaybackAudioOnly();
-    this.playback = null;
-    this.paused = false;
-    this.isMultiTrackPlaying = false;
+    if (!opts.preservePlayback) {
+      this.stopPlaybackAudioOnly();
+      this.playback = null;
+      this.paused = false;
+      this.isMultiTrackPlaying = false;
+    }
     this.clips = editorUtils.copyClips(nextClips);
     const target = typeof opts.selectedClipIndex === 'number' ? opts.selectedClipIndex : this.selectedClipIndex;
     this.selectedClipIndex = editorUtils.clampNumber(target, 0, this.clips.length - 1);
     if (opts.clearSelection !== false) this.selection = null;
     const clip = this.getSelectedClip();
-    if (clip && opts.jumpToIn !== false) this.currentSourceTime = clip.in;
+    if (clip && opts.jumpToIn !== false && !opts.preservePlayback) this.currentSourceTime = clip.in;
     this.syncWaveSource();
     if (this.selection) this.pushSelectionData(true);
     else this.setData({ hasSelection: false, selection: null });
@@ -2851,7 +2853,10 @@ Page({
 
   switchInspectorTab(e) {
     const tab = e.currentTarget.dataset.tab;
-    if (tab) this.setData({ inspectorTab: tab });
+    if (tab) {
+      this.setData({ inspectorTab: tab });
+      haptics.impactLight();
+    }
   },
 
   setClipTrack(e) {
@@ -2910,11 +2915,14 @@ Page({
     const clip = this.getSelectedClip();
     if (!clip) return;
     this.pushUndo();
-    this.stopPlaybackAudioOnly();
-    this.playback = null;
-    this.paused = false;
     this.clips[this.selectedClipIndex].eqPreset = preset;
+    if (this.playback && this.playback.queue) {
+      this.playback.queue.forEach(item => {
+        if (item.clipId === clip.id) item.eqPreset = preset;
+      });
+    }
     this.refreshClipData();
+    haptics.impactLight();
     const info = editorUtils.getEqPreset(preset);
     wx.showToast({ title: `均衡器：${info ? info.label : preset}`, icon: 'none' });
   },
@@ -2925,11 +2933,14 @@ Page({
     const clip = this.getSelectedClip();
     if (!clip) return;
     this.pushUndo();
-    this.stopPlaybackAudioOnly();
-    this.playback = null;
-    this.paused = false;
     this.clips[this.selectedClipIndex].denoise = val;
+    if (this.playback && this.playback.queue) {
+      this.playback.queue.forEach(item => {
+        if (item.clipId === clip.id) item.denoise = val;
+      });
+    }
     this.refreshClipData();
+    haptics.impactLight();
     wx.showToast({ title: val > 0 ? `降噪已开启 (${val}dB)` : '降噪已关闭', icon: 'none' });
   },
 
@@ -2939,6 +2950,18 @@ Page({
       selectedClipGainDb: val,
       selectedClipGainText: editorUtils.formatDb(val),
     });
+    const clip = this.getSelectedClip();
+    if (clip) {
+      clip.volumeDb = val;
+      if (this.playback && this.playback.queue) {
+        this.playback.queue.forEach(item => {
+          if (item.clipId === clip.id) item.volumeDb = val;
+        });
+      }
+      if (this.data.isPlaying) {
+        this.applyPreviewVolume(this.currentSourceTime);
+      }
+    }
   },
 
   onClipGainChange(e) {
@@ -2946,22 +2969,34 @@ Page({
     const clip = this.getSelectedClip();
     if (!clip) return;
     this.pushUndo();
-    this.stopPlaybackAudioOnly();
-    this.playback = null;
-    this.paused = false;
     this.clips[this.selectedClipIndex].volumeDb = val;
+    if (this.playback && this.playback.queue) {
+      this.playback.queue.forEach(item => {
+        if (item.clipId === clip.id) item.volumeDb = val;
+      });
+    }
     this.refreshClipData();
+    if (this.data.isPlaying) {
+      this.applyPreviewVolume(this.currentSourceTime);
+    }
+    haptics.impactLight();
   },
 
   resetClipGain() {
     const clip = this.getSelectedClip();
     if (!clip) return;
     this.pushUndo();
-    this.stopPlaybackAudioOnly();
-    this.playback = null;
-    this.paused = false;
     this.clips[this.selectedClipIndex].volumeDb = 0;
+    if (this.playback && this.playback.queue) {
+      this.playback.queue.forEach(item => {
+        if (item.clipId === clip.id) item.volumeDb = 0;
+      });
+    }
     this.refreshClipData();
+    if (this.data.isPlaying) {
+      this.applyPreviewVolume(this.currentSourceTime);
+    }
+    haptics.impactLight();
     wx.showToast({ title: '增益已复位 (0 dB)', icon: 'none' });
   },
 
@@ -3362,23 +3397,29 @@ Page({
     const clip = this.clips[index];
     if (!clip) return;
     const next = this.clips.slice();
-    const updated = {
-      id: clip.id,
-      sourceId: clip.sourceId,
-      in: clip.in,
-      out: clip.out,
-      fadeIn: clip.fadeIn,
-      fadeOut: clip.fadeOut,
-    };
+    const updated = Object.assign({}, clip);
     updated[key] = editorUtils.toNonNegative(value);
     next[index] = updated;
     const adjusted = editorUtils.effectiveClipFades(updated).adjusted;
+    if (this.playback && this.playback.queue) {
+      this.playback.queue.forEach(item => {
+        if (item.clipId === clip.id) {
+          item[key] = updated[key];
+        }
+      });
+    }
+    const wasPlaying = this.data.isPlaying;
     this.commitClips(next, {
       selectedClipIndex: index,
       jumpToIn: false,
       clearSelection: false,
+      preservePlayback: wasPlaying,
       toast: adjusted ? '片段较短，导出时淡入淡出会自动缩短' : '',
     });
+    if (wasPlaying) {
+      this.applyPreviewVolume(this.currentSourceTime);
+    }
+    haptics.impactLight();
   },
 
   onVolumeChanging(e) {

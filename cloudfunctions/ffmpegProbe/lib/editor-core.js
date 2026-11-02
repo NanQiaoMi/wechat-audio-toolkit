@@ -687,6 +687,8 @@ function buildFilterGraphV2(plan) {
       chain.push('bass=g=6:f=100')
     } else if (clip.eqPreset === 'treble') {
       chain.push('treble=g=5:f=6000')
+    } else if (clip.eqPreset === 'warm') {
+      chain.push('equalizer=f=350:width_type=h:width=250:g=3,lowpass=f=12000')
     }
     // ③ 智能降噪
     if (clip.denoise && clip.denoise > 0) {
