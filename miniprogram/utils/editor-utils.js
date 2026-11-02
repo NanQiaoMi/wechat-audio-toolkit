@@ -834,20 +834,23 @@ function buildTimelineData(tracks, clips, sources, zoomScale, selectedClipIndex,
   var timelineWidthRpx = Math.max(540, Math.round(maxTimelineSec * pxPerSec) + 120);
   var playheadRpx = Math.round(playhead * pxPerSec);
 
-  // 动态标尺刻度：自适应微缩到全览（支持长达10分钟音频全景）
-  var stepSec = 5;
-  if (scale <= 0.06) stepSec = 60;
-  else if (scale <= 0.15) stepSec = 30;
-  else if (scale <= 0.35) stepSec = 15;
-  else if (scale <= 0.7) stepSec = 10;
-  else if (scale <= 1.5) stepSec = 5;
-  else if (scale <= 2.5) stepSec = 2;
-  else stepSec = 1;
+  // 动态标尺刻度：自适应像素密度计算，确保刻度文字间距至少 60rpx，永不重叠拥挤，且完整覆盖 10 分钟全景
+  var minSeparationRpx = 60;
+  var targetStep = minSeparationRpx / Math.max(0.1, pxPerSec);
+  var stepCandidates = [1, 2, 5, 10, 15, 30, 60, 120, 300];
+  var stepSec = 300;
+  for (var k = 0; k < stepCandidates.length; k++) {
+    if (stepCandidates[k] >= targetStep) {
+      stepSec = stepCandidates[k];
+      break;
+    }
+  }
 
   var rulerTicks = [];
-  var maxTicks = 45;
+  var maxSafeTicks = 500;
   var tickCount = 0;
-  for (var s = 0; s <= maxTimelineSec + stepSec * 2 && tickCount < maxTicks; s += stepSec) {
+  var endSec = maxTimelineSec + stepSec;
+  for (var s = 0; s <= endSec && tickCount < maxSafeTicks; s += stepSec) {
     rulerTicks.push({
       sec: s,
       text: formatClock(s),

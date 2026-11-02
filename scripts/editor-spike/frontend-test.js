@@ -2238,6 +2238,68 @@ smokeTest('播放时钟高精物理插值引擎：全片播放时间码连续递
   page.onUnload();
 });
 
+smokeTest('触感微交互、拖拽悬浮时码气泡与自适应标尺密度集成验证', async () => {
+  const vibrateLog = [];
+  const stub = createWxStub({
+    chooseBatches: [[{ path: 'wxfile://tmp/voice.mp3', name: 'voice.mp3', size: 1024 * 1024 }]],
+    analyzeResults: [
+      makeAnalyzeResponse({
+        duration: 20,
+        sampleRate: 44100,
+        channels: 2,
+        format: 'mp3',
+        peaks: Buffer.alloc(400, 128).toString('base64'),
+      }),
+    ],
+  });
+  stub.wx.vibrateShort = function (opts) {
+    vibrateLog.push(opts ? opts.type : 'light');
+  };
+
+  const page = loadEditorPage(stub.wx);
+  page.onLoad();
+  page.onShow();
+  page.chooseAudioFiles();
+  await wait(80);
+
+  // 1. 验证时间标尺点击触发轻微触感
+  vibrateLog.length = 0;
+  page.onRulerTickTap({ currentTarget: { dataset: { time: 5 } } });
+  assert.strictEqual(page.data.currentTimeText, '00:05.0');
+  assert.ok(vibrateLog.includes('light'), '点击时间标尺刻度应触发 light 触感反馈');
+
+  // 2. 验证复制触发 light 触感
+  await wait(80); // 超出 60ms 防抖门禁
+  vibrateLog.length = 0;
+  page.copySelectedClip();
+  assert.ok(vibrateLog.includes('light'), '复制片段应触发 light 触感');
+
+  // 3. 验证分割触发 heavy 坚实剃刀触感
+  await wait(80);
+  vibrateLog.length = 0;
+  page.currentSourceTime = 2.0;
+  page.splitSelectedClipAtPlayhead();
+  assert.ok(vibrateLog.includes('heavy'), '切断片段应触发 heavy 坚实剃刀触感');
+
+  // 4. 验证删除触发 medium 触感
+  await wait(80);
+  vibrateLog.length = 0;
+  page.deleteSelectedClip();
+  assert.ok(vibrateLog.includes('medium'), '删除片段应触发 medium 触感');
+
+  // 5. 验证 app.wxss 中存在 .scrubbing-time-bubble 声明
+  const appWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.wxss'), 'utf-8');
+  assert.ok(appWxss.includes('.scrubbing-time-bubble'), 'app.wxss 必须包含全局 .scrubbing-time-bubble 悬浮气泡类定义');
+  assert.ok(appWxss.includes('bubblePop'), 'app.wxss 必须包含 bubblePop 丝滑微弹入动效');
+
+  // 6. 验证自适应标尺生成：各缩放等级下刻度间距与总长覆盖
+  const rulerTicks = page.data.timelineData.rulerTicks;
+  assert.ok(rulerTicks && rulerTicks.length > 0, '标尺刻度数据必须存在');
+  assert.strictEqual(rulerTicks[0].sec, 0);
+
+  page.onUnload();
+});
+
 /* ========================================================================== */
 /* 汇总                                                                       */
 /* ========================================================================== */

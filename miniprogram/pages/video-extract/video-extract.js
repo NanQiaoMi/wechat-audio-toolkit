@@ -1,10 +1,14 @@
 // miniprogram/pages/video-extract/video-extract.js
 const videoExtractor = require('../../utils/video-extractor');
 const libraryStore = require('../../utils/library-store');
+const haptics = require('../../utils/haptics');
 
 Page({
   data: {
     status: 'idle', // 'idle' | 'extracting' | 'success' | 'error'
+    isScrubbing: false,
+    scrubbingPercent: 0,
+    scrubbingTimeText: '00:00',
     videoInfo: {
       name: '',
       size: 0,
@@ -494,6 +498,7 @@ Page({
       title: mode === 'local' ? '极速提取成功' : '云端转码成功',
       icon: 'success',
     });
+    haptics.notificationSuccess();
   },
 
   /**
@@ -505,6 +510,7 @@ Page({
       return;
     }
 
+    haptics.impactLight();
     if (this.data.isPlaying) {
       this.audioCtx.pause();
     } else {
@@ -525,18 +531,23 @@ Page({
   },
 
   onSliderChanging(e) {
-    this.setData({ isSliderSeeking: true });
-    const percent = e && e.detail ? e.detail.value : 0;
+    const percent = e && e.detail ? Number(e.detail.value) : 0;
     const dur = this.data.resultAudio.duration || 1;
     const seekSec = (percent / 100) * dur;
+    const clampedPct = Math.max(6, Math.min(94, percent));
+    haptics.impactLight();
     this.setData({
+      isSliderSeeking: true,
+      isScrubbing: true,
+      scrubbingPercent: clampedPct,
+      scrubbingTimeText: videoExtractor.formatSeconds(seekSec),
       playCurrentTime: seekSec,
       playCurrentTimeText: videoExtractor.formatSeconds(seekSec),
     });
   },
 
   onSliderChange(e) {
-    const percent = e && e.detail ? e.detail.value : 0;
+    const percent = e && e.detail ? Number(e.detail.value) : 0;
     const dur = this.data.resultAudio.duration || 1;
     const seekSec = (percent / 100) * dur;
 
@@ -546,8 +557,10 @@ Page({
       } catch (err) {}
     }
 
+    haptics.impactMedium();
     this.setData({
       isSliderSeeking: false,
+      isScrubbing: false,
       playCurrentTime: seekSec,
       playCurrentTimeText: videoExtractor.formatSeconds(seekSec),
       sliderValue: percent,

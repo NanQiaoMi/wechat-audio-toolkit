@@ -875,6 +875,38 @@ async function runAll() {
     // 验证 app.wxss 全局消除微信 184px button 溢出缺陷
     const appWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.wxss'), 'utf8');
     assert.ok(appWxss.indexOf("button:not([size='mini'])") >= 0, 'app.wxss 必须重置 button:not([size=mini]) 规避 184px 溢出');
+
+    // 验证悬浮时码气泡与相对定位
+    assert.ok(wxml.indexOf('scrubbing-time-bubble') >= 0, 'video-extract.wxml 必须包含悬浮时码气泡 scrubbing-time-bubble');
+    assert.ok(wxss.indexOf('position: relative') >= 0, 'player-progress-area 必须声明 position: relative');
+  });
+
+  it('video-extract page: 拖拽进度条触发时码气泡与轻微触感', () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) {
+        Object.assign(this.data, patch);
+      },
+    });
+    page.data.resultAudio = { duration: 120, title: 'test', format: 'mp3' };
+    
+    // 模拟拖动中
+    page.onSliderChanging({ detail: { value: 50 } });
+    assert.strictEqual(page.data.isSliderSeeking, true);
+    assert.strictEqual(page.data.isScrubbing, true);
+    assert.strictEqual(page.data.scrubbingPercent, 50);
+    assert.strictEqual(page.data.scrubbingTimeText, '01:00');
+
+    // 模拟松手
+    page.onSliderChange({ detail: { value: 75 } });
+    assert.strictEqual(page.data.isSliderSeeking, false);
+    assert.strictEqual(page.data.isScrubbing, false);
+    assert.strictEqual(page.data.playCurrentTime, 90);
   });
 
   console.log('\n============================================');

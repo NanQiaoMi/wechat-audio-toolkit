@@ -10,6 +10,7 @@
  */
 
 const recordAudio = require('../../utils/record-audio.js');
+const haptics = require('../../utils/haptics.js');
 
 // ---- 录音参数契约（原生 PCM 实时流采集，支持 100% 真实物理声波计算）----
 const RECORD_OPTIONS = {
@@ -120,6 +121,9 @@ Page({
     // 中断即时回放（Audition While Paused / Interrupted）
     pausedPreviewReady: false,
     pausedIsPlaying: false,
+    isPausedScrubbing: false,
+    pausedScrubbingPercent: 0,
+    pausedScrubbingTimeText: '00:00',
     pausedDuration: 0,
     pausedDurationText: '00:00',
     pausedCurrentTime: 0,
@@ -132,6 +136,9 @@ Page({
     errorText: '',
 
     // REVIEW：录音结果
+    isPreviewScrubbing: false,
+    previewScrubbingPercent: 0,
+    previewScrubbingTimeText: '00:00',
     tempFilePath: '',
     fileName: '',
     fileSize: 0,
@@ -560,6 +567,7 @@ Page({
       elapsedText: '00:00',
       interrupted: false,
     });
+    haptics.impactHeavy();
     this.startTimer();
     // start 期间页面被切走：立即暂停，避免后台持续录音
     if (this.pageHidden) {
@@ -608,6 +616,7 @@ Page({
   pauseRecording() {
     if (this.data.status !== 'recording') return;
     this.freezeTimer();
+    haptics.impactLight();
     this.setData({ status: 'paused' });
     if (this.recorder) {
       try {
@@ -691,6 +700,7 @@ Page({
 
   onTogglePausedPreview() {
     if (this.data.status !== 'paused' || !this.pausedAudioCtx) return;
+    haptics.impactLight();
     if (this.data.pausedIsPlaying) {
       try { this.pausedAudioCtx.pause(); } catch (e) {}
       this.setData({ pausedIsPlaying: false });
@@ -702,13 +712,31 @@ Page({
     }
   },
 
+  onPausedPreviewSeeking(e) {
+    if (this.data.status !== 'paused') return;
+    const detail = (e && e.detail) || {};
+    const val = Number(detail.value) || 0;
+    const dur = Math.max(1, this.data.pausedDuration || 1);
+    const pct = Math.max(6, Math.min(94, Math.round((val / dur) * 100)));
+    haptics.impactLight();
+    this.setData({
+      isPausedScrubbing: true,
+      pausedScrubbingPercent: pct,
+      pausedScrubbingTimeText: formatSeconds(val),
+      pausedCurrentTime: val,
+      pausedCurrentText: formatSeconds(val),
+    });
+  },
+
   onPausedPreviewSeek(e) {
     if (this.data.status !== 'paused' || !this.pausedAudioCtx) return;
     const detail = (e && e.detail) || {};
     const val = Number(detail.value);
     if (isNaN(val)) return;
     try { this.pausedAudioCtx.seek(val); } catch (e) {}
+    haptics.impactMedium();
     this.setData({
+      isPausedScrubbing: false,
       pausedCurrentTime: val,
       pausedSliderValue: val,
       pausedCurrentText: formatSeconds(val),
@@ -721,6 +749,7 @@ Page({
 
   resumeRecording() {
     if (this.data.status !== 'paused') return;
+    haptics.impactLight();
     // 恢复录音前停止中断回放音频
     if (this.pausedAudioCtx) {
       try { this.pausedAudioCtx.stop(); } catch (e) {}
@@ -829,6 +858,7 @@ Page({
       previewCurrentText: '00:00',
       previewDurationText: formatClock(durationMs),
     });
+    haptics.notificationSuccess();
 
     if (this.audioCtx) {
       try {
@@ -935,6 +965,7 @@ Page({
   onTogglePreview() {
     if (this.data.status !== 'review' || !this.audioCtx) return;
     const ctx = this.audioCtx;
+    haptics.impactLight();
     if (this.data.isPlaying) {
       try {
         ctx.pause();
@@ -952,6 +983,22 @@ Page({
     } catch (e) {}
   },
 
+  onPreviewSeeking(e) {
+    if (this.data.status !== 'review') return;
+    const detail = (e && e.detail) || {};
+    const value = Number(detail.value) || 0;
+    const dur = Math.max(1, this.data.previewDuration || 1);
+    const pct = Math.max(6, Math.min(94, Math.round((value / dur) * 100)));
+    haptics.impactLight();
+    this.setData({
+      isPreviewScrubbing: true,
+      previewScrubbingPercent: pct,
+      previewScrubbingTimeText: formatSeconds(value),
+      previewValue: value,
+      previewCurrentText: formatSeconds(value),
+    });
+  },
+
   onPreviewSeek(e) {
     if (this.data.status !== 'review' || !this.audioCtx) return;
     const detail = (e && e.detail) || {};
@@ -960,7 +1007,9 @@ Page({
     try {
       this.audioCtx.seek(value);
     } catch (err) {}
+    haptics.impactMedium();
     this.setData({
+      isPreviewScrubbing: false,
       previewValue: value,
       previewCurrentText: formatSeconds(value),
     });

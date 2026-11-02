@@ -121,6 +121,9 @@
             <text class="paused-play-icon">{{pausedIsPlaying ? '⏸' : '▶'}}</text>
           </view>
           <view class="paused-slider-column">
+            <view wx:if="{{isPausedScrubbing}}" class="scrubbing-time-bubble" style="left: {{pausedScrubbingPercent}}%;">
+              {{pausedScrubbingTimeText}}
+            </view>
             <slider
               class="paused-slider"
               min="0"
@@ -130,6 +133,7 @@
               block-size="14"
               activeColor="#FF6B00"
               backgroundColor="#EAE6DF"
+              bindchanging="onPausedPreviewSeeking"
               bindchange="onPausedPreviewSeek"
             />
             <view class="paused-time-meta">
@@ -187,6 +191,9 @@
           <text>{{isPlaying ? '⏸' : '▶'}}</text>
         </view>
         <view class="player-slider-wrap">
+          <view wx:if="{{isPreviewScrubbing}}" class="scrubbing-time-bubble" style="left: {{previewScrubbingPercent}}%;">
+            {{previewScrubbingTimeText}}
+          </view>
           <slider
             class="player-slider"
             min="0"
@@ -196,6 +203,7 @@
             block-size="14"
             activeColor="#FF6B00"
             backgroundColor="#E7E5E4"
+            bindchanging="onPreviewSeeking"
             bindchange="onPreviewSeek"
           />
           <view class="player-time-row">

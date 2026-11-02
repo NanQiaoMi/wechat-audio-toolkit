@@ -136,6 +136,9 @@
         </view>
         
         <view class="player-progress-area">
+          <view wx:if="{{isScrubbing}}" class="scrubbing-time-bubble" style="left: {{scrubbingPercent}}%;">
+            {{scrubbingTimeText}}
+          </view>
           <slider
             class="custom-slider"
             min="0"

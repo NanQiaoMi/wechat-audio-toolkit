@@ -1,6 +1,7 @@
 // miniprogram/pages/index/index.js
 const app = getApp();
 const libraryStore = require('../../utils/library-store.js');
+const haptics = require('../../utils/haptics.js');
 
 // 与云函数保持一致：A 路线下各输出格式的保守时长上限（秒）
 const FORMAT_LIMIT_SEC = { mp3: 1200, wav: 1800, flac: 1800, m4a: 600, aac: 600, ogg: 600 };
@@ -36,15 +37,23 @@ Page({
     status: 'IDLE',
     statusText: '准备就绪',
 
-    // 源音频数据
+    // 源音频数据与悬浮气泡
     sourceFile: null,
     sourcePlayable: false,
     isSourcePlaying: false,
+    isSourceScrubbing: false,
+    sourceScrubbingPercent: 0,
+    sourceScrubbingTimeText: '00:00',
     sourceDuration: 0,
     sourceCurrentTime: 0,
     sourceDurationText: '00:00',
     sourceCurrentTimeText: '00:00',
     soundBars: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+
+    // 目标音频数据与悬浮气泡
+    isTargetScrubbing: false,
+    targetScrubbingPercent: 0,
+    targetScrubbingTimeText: '00:00',
 
     // 格式定义 (Refero Superr 风格化标签)
     formats: [
@@ -398,6 +407,7 @@ Page({
    */
   togglePlaySource() {
     if (!this.sourceAudioCtx || !this.data.sourceFile) return;
+    haptics.impactLight();
     if (this.data.isSourcePlaying) {
       this.sourceAudioCtx.pause();
     } else {
@@ -406,11 +416,31 @@ Page({
     }
   },
 
+  onSourceSeeking(e) {
+    const val = Number(e.detail.value);
+    const dur = Math.max(1, this.data.sourceDuration || 1);
+    const pct = Math.max(6, Math.min(94, Math.round((val / dur) * 100)));
+    haptics.impactLight();
+    this.setData({
+      isSourceScrubbing: true,
+      sourceScrubbingPercent: pct,
+      sourceScrubbingTimeText: formatTime(val),
+    });
+  },
+
   onSourceSeek(e) {
-    const val = e.detail.value;
+    const val = Number(e.detail.value);
     if (this.sourceAudioCtx) {
-      this.sourceAudioCtx.seek(val);
+      try {
+        this.sourceAudioCtx.seek(val);
+      } catch (err) {}
     }
+    haptics.impactMedium();
+    this.setData({
+      isSourceScrubbing: false,
+      sourceCurrentTime: val,
+      sourceCurrentTimeText: formatTime(val),
+    });
   },
 
   /**
@@ -420,9 +450,7 @@ Page({
     const format = e.currentTarget.dataset.format;
     this.setData({ targetFormat: format });
     this.updateCompressionEstimate();
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-    }
+    haptics.impactLight();
   },
 
   /**
@@ -467,22 +495,21 @@ Page({
     const idx = Number(e.currentTarget.dataset.index) || 0;
     this.setData({ compressionIndex: idx });
     this.updateCompressionEstimate();
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-    }
+    haptics.impactLight();
   },
 
   onBitrateSliderChange(e) {
     const idx = Number(e.detail.value) || 0;
     this.setData({ compressionIndex: idx });
     this.updateCompressionEstimate();
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-    }
+    haptics.impactLight();
   },
 
   onBitrateSliderChanging(e) {
     const idx = Number(e.detail.value) || 0;
+    if (idx !== this.data.compressionIndex) {
+      haptics.impactLight();
+    }
     this.setData({ compressionIndex: idx });
     this.updateCompressionEstimate();
   },
@@ -490,18 +517,14 @@ Page({
   quickExtremeCompress() {
     this.setData({ compressionIndex: 0 }); // 64k 极小体积
     this.updateCompressionEstimate();
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'medium' }); } catch (err) {}
-    }
+    haptics.impactMedium();
     wx.showToast({ title: '已开启极限压缩 (64k)', icon: 'none' });
   },
 
   switchToMp3Compress() {
     this.setData({ targetFormat: 'mp3' });
     this.updateCompressionEstimate();
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'medium' }); } catch (err) {}
-    }
+    haptics.impactMedium();
     wx.showToast({ title: '已切为 MP3 并开启压缩', icon: 'none' });
   },
 
@@ -667,6 +690,7 @@ Page({
       });
 
       wx.showToast({ title: '转码成功！', icon: 'success' });
+      haptics.notificationSuccess();
     } catch (err) {
       console.error('转码过程错误:', err);
       this.setData({ status: 'IDLE', statusText: '准备就绪' });
@@ -694,6 +718,7 @@ Page({
       return;
     }
 
+    haptics.impactLight();
     if (isTargetPlaying) {
       this.targetAudioCtx.pause();
     } else {
@@ -733,11 +758,31 @@ Page({
     }
   },
 
+  onTargetSeeking(e) {
+    const val = Number(e.detail.value);
+    const dur = Math.max(1, this.data.targetDuration || 1);
+    const pct = Math.max(6, Math.min(94, Math.round((val / dur) * 100)));
+    haptics.impactLight();
+    this.setData({
+      isTargetScrubbing: true,
+      targetScrubbingPercent: pct,
+      targetScrubbingTimeText: formatTime(val),
+    });
+  },
+
   onTargetSeek(e) {
-    const val = e.detail.value;
+    const val = Number(e.detail.value);
     if (this.targetAudioCtx) {
-      this.targetAudioCtx.seek(val);
+      try {
+        this.targetAudioCtx.seek(val);
+      } catch (err) {}
     }
+    haptics.impactMedium();
+    this.setData({
+      isTargetScrubbing: false,
+      targetCurrentTime: val,
+      targetCurrentTimeText: formatTime(val),
+    });
   },
 
   /**
