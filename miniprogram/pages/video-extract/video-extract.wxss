@@ -332,11 +332,11 @@
 }
 
 /* ============================================================
-   4. 提取成功结果卡片 (Fresh Master Victory Card，完全统一首页规范)
+   4. 提取成功结果卡片 (Fresh Master Victory Card，极简暖纸统一规范)
 ============================================================ */
 .result-success-card {
   align-items: stretch;
-  padding: 36rpx 28rpx;
+  padding: 34rpx 28rpx;
   gap: 22rpx;
   background-color: #FFFFFF;
   border-radius: 28rpx;
@@ -346,12 +346,14 @@
   width: 100%;
 }
 
-/* 头部成功指示行 */
+/* 头部成功指示行 (左右对称，严格垂直居中) */
 .result-top-badge {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding-bottom: 2rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .result-title-group {
@@ -361,16 +363,17 @@
 }
 
 .success-icon {
-  width: 38rpx;
-  height: 38rpx;
+  width: 36rpx;
+  height: 36rpx;
   border-radius: 50%;
-  background-color: #16A34A;
+  background-color: #10B981;
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 900;
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -378,106 +381,100 @@
   font-size: 30rpx;
   font-weight: 800;
   color: #1C1917;
+  line-height: 1.2;
   letter-spacing: -0.3rpx;
 }
 
-.header-right-action {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
 .cost-tag {
-  font-size: 21rpx;
-  font-weight: 700;
-  color: #16A34A;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #78716C;
+  line-height: 1.2;
 }
 
-.repick-btn-pill {
+/* 体积对比看板 (极简暖纸风，三列绝对居中对齐，色彩克制) */
+.size-comparison-board {
   background-color: #FAF8F5;
   border: 1px solid #EAE6DF;
-  border-radius: 999rpx;
-  padding: 6rpx 16rpx;
-  font-size: 20rpx;
-  color: #57534E;
-  font-weight: 600;
-  transition: all 0.15s ease;
-}
-
-.repick-btn-pill:active,
-.pill-hover {
-  background-color: #EAE6DF;
-  transform: scale(0.95);
-}
-
-/* 体积对比看板 (Before & After Contrast Board) */
-.size-comparison-board {
-  background-color: #F8FAF8;
-  border: 1px solid #DCFCE7;
   border-radius: 20rpx;
-  padding: 22rpx 28rpx;
+  padding: 22rpx 16rpx;
   display: flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: space-between;
   box-sizing: border-box;
   width: 100%;
 }
 
 .comp-item {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
 }
 
 .comp-label {
   font-size: 20rpx;
   color: #78716C;
+  line-height: 1.2;
+  margin-bottom: 2rpx;
 }
 
 .comp-number {
   font-size: 32rpx;
   font-weight: 800;
   color: #1C1917;
-  margin: 4rpx 0;
+  line-height: 1.2;
+  margin: 6rpx 0;
 }
 
 .comp-format-tag {
-  font-size: 18rpx;
+  font-size: 19rpx;
   font-weight: 700;
   background-color: #E7E5E4;
   color: #44403C;
-  padding: 2rpx 10rpx;
-  border-radius: 8rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  line-height: 1.3;
 }
 
 .comp-format-tag.accent {
-  background-color: #16A34A;
+  background-color: #1C1917;
   color: #FFFFFF;
 }
 
 .comp-center-divider {
+  width: 130rpx;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4rpx;
+  justify-content: center;
+  text-align: center;
+  gap: 6rpx;
 }
 
 .comp-arrow-symbol {
-  font-size: 32rpx;
+  font-size: 26rpx;
   font-weight: 800;
-  color: #16A34A;
+  color: #A8A29E;
+  line-height: 1;
 }
 
 .comp-saved-badge {
-  font-size: 18rpx;
-  font-weight: 800;
-  background-color: #16A34A;
-  color: #FFFFFF;
+  font-size: 19rpx;
+  font-weight: 700;
+  background-color: #FFF7ED;
+  color: #C2410C;
+  border: 1px solid #FFEDD5;
   padding: 2rpx 12rpx;
-  border-radius: 12rpx;
+  border-radius: 999rpx;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
-/* 提取音频元数据标题行 */
+/* 提取音频元数据标题行 (单行截断，图标与标签居中对齐) */
 .extracted-title-bar {
   display: flex;
   align-items: center;
@@ -485,20 +482,21 @@
   background-color: #FAF8F5;
   border: 1px solid #EAE6DF;
   border-radius: 20rpx;
-  padding: 18rpx 20rpx;
+  padding: 16rpx 20rpx;
   box-sizing: border-box;
   width: 100%;
 }
 
 .meta-icon-box {
-  width: 68rpx;
-  height: 68rpx;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 16rpx;
   background-color: #F0EDE6;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 34rpx;
+  font-size: 32rpx;
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -506,7 +504,7 @@
   display: flex;
   flex-direction: column;
   gap: 6rpx;
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -514,6 +512,7 @@
   font-size: 25rpx;
   font-weight: 700;
   color: #1C1917;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -527,10 +526,11 @@
 }
 
 .pill-badge {
-  border-radius: 8rpx;
+  border-radius: 6rpx;
   padding: 2rpx 10rpx;
   font-size: 19rpx;
   font-weight: 700;
+  line-height: 1.3;
 }
 
 .pill-badge.codec-badge {
@@ -549,17 +549,16 @@
 }
 
 .pill-badge.cloud-convert-badge {
-  background-color: #FEF3C7;
-  color: #B45309;
-  border: 1px solid #FCD34D;
-  margin-left: 4rpx;
+  background-color: #F5F3EE;
+  color: #78716C;
+  border: 1px solid #E7E5E4;
 }
 
-/* 原声高保真试听面板 (与首页一致) */
+/* 原声高保真试听面板 (沉稳温暖灰，滑轨与时间码对称对齐) */
 .result-audition-box {
   display: flex;
   flex-direction: column;
-  gap: 14rpx;
+  gap: 12rpx;
   width: 100%;
   box-sizing: border-box;
 }
@@ -568,34 +567,37 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
 }
 
 .audition-title-wrap {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 10rpx;
 }
 
 .audition-title {
-  font-size: 25rpx;
+  font-size: 24rpx;
   font-weight: 700;
   color: #1C1917;
+  line-height: 1;
 }
 
 .audition-playing-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8rpx;
-  background-color: #DCFCE7;
+  gap: 6rpx;
+  background-color: #FFF7ED;
+  border: 1px solid #FFEDD5;
   border-radius: 999rpx;
-  padding: 4rpx 14rpx;
+  padding: 2rpx 12rpx;
 }
 
 .wave-dot-anim {
-  width: 12rpx;
-  height: 12rpx;
+  width: 10rpx;
+  height: 10rpx;
   border-radius: 50%;
-  background-color: #16A34A;
+  background-color: #FF6B00;
   animation: primaryPlayPulse 1.2s infinite ease-in-out;
 }
 
@@ -608,37 +610,39 @@
 .playing-txt {
   font-size: 19rpx;
   font-weight: 700;
-  color: #15803D;
+  color: #C2410C;
+  line-height: 1;
 }
 
 .prep-indicator.ready {
   font-size: 20rpx;
-  color: #16A34A;
-  font-weight: 600;
+  color: #78716C;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .result-inline-player {
-  background-color: #F8FAF8;
-  border: 1px solid #DCFCE7;
+  background-color: #FAF8F5;
+  border: 1px solid #EAE6DF;
   border-radius: 20rpx;
   padding: 16rpx 20rpx;
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 18rpx;
   box-sizing: border-box;
   width: 100%;
 }
 
 .player-play-btn {
-  width: 76rpx;
-  height: 76rpx;
+  width: 74rpx;
+  height: 74rpx;
   border-radius: 50%;
   background-color: #1C1917;
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(28, 25, 23, 0.2);
+  box-shadow: 0 4rpx 12rpx rgba(28, 25, 23, 0.15);
   flex-shrink: 0;
   transition: all 0.15s ease;
 }
@@ -650,18 +654,21 @@
 
 .player-play-btn.playing {
   background-color: #FF6B00;
-  box-shadow: 0 4rpx 14rpx rgba(255, 107, 0, 0.3);
+  box-shadow: 0 4rpx 14rpx rgba(255, 107, 0, 0.28);
 }
 
 .play-btn-icon {
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 800;
   line-height: 1;
 }
 
 .player-progress-area {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .custom-slider {
@@ -672,13 +679,16 @@
 .player-time-display {
   display: flex;
   justify-content: space-between;
-  margin-top: 4rpx;
+  align-items: center;
+  padding: 2rpx 2rpx 0;
+  margin-top: 2rpx;
 }
 
 .time-item {
   font-size: 20rpx;
   color: #78716C;
   font-family: monospace;
+  line-height: 1;
 }
 
 .time-item.current {
@@ -687,17 +697,17 @@
 }
 
 /* ============================================================
-   操作导出按钮组体系 (彻底清除 184px 顽疾，完全对齐首页)
+   操作导出按钮组体系 (色彩克制统一、双列严格对称 50/50、文字绝对对齐)
 ============================================================ */
 .result-action-buttons {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 14rpx;
   width: 100% !important;
   box-sizing: border-box;
 }
 
-/* 关键：强制重置微信 button:not([size='mini']) 的 184px 默认宽度 */
+/* 强制重置微信 button:not([size='mini']) 的默认样式与溢出行为 */
 .result-action-buttons button,
 .export-btn {
   width: 100% !important;
@@ -707,66 +717,98 @@
   padding: 0 !important;
   font-size: 28rpx;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   border: none;
-  line-height: 1;
+  line-height: 1 !important;
   box-sizing: border-box !important;
   transition: all 0.15s ease;
 }
 
-.export-btn:active,
-.btn-hover-active {
-  transform: scale(0.97);
-  opacity: 0.92;
+.export-btn::after {
+  border: none !important;
 }
 
-/* 核心英雄级主行动：送入多轨剪辑 (全宽 96rpx 暖橙胶囊) */
+.export-btn:active,
+.btn-hover-active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+/* 核心英雄级主行动：送入多轨剪辑 (全宽 92rpx 暖橙胶囊，唯一高亮主行动) */
 .export-btn.primary-editor {
-  background-color: #FF6B00;
-  color: #FFFFFF;
-  height: 96rpx;
-  box-shadow: 0 6rpx 20rpx rgba(255, 107, 0, 0.28);
+  background-color: #FF6B00 !important;
+  color: #FFFFFF !important;
+  height: 92rpx !important;
+  box-shadow: 0 6rpx 20rpx rgba(255, 107, 0, 0.25) !important;
 }
 
 .btn-icon-emoji {
   font-size: 30rpx;
+  line-height: 1;
+  margin-right: 8rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 双列次级操作区 (50/50 严格自适应对称，绝无右侧溢出) */
+.btn-label-text {
+  font-size: 27rpx;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* 双列次级操作区 (50/50 严格自适应对称，统一高级暖纸质感，杜绝颜色杂乱与右侧溢出) */
 .sub-export-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16rpx;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  gap: 14rpx !important;
   width: 100% !important;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
 }
 
-.sub-export-row button,
+.sub-export-row .sub-btn,
 .sub-export-row .export-btn {
-  width: 100% !important;
+  flex: 1 1 0% !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
   margin: 0 !important;
+  padding: 0 10rpx !important;
+  height: 84rpx !important;
+  line-height: 84rpx !important;
+  border-radius: 999rpx !important;
+  background-color: #FAF8F5 !important;
+  border: 1px solid #D6D1C7 !important;
+  color: #1C1917 !important;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04) !important;
 }
 
-.export-btn.primary-share {
-  background-color: #16A34A;
-  color: #FFFFFF;
-  height: 86rpx;
-  box-shadow: 0 4rpx 16rpx rgba(22, 163, 74, 0.25);
+.sub-export-row .sub-btn:active {
+  background-color: #F0EDE6 !important;
+  transform: scale(0.98);
+}
+
+.sub-export-row .sub-btn .btn-icon-emoji {
   font-size: 26rpx;
+  line-height: 1;
+  margin-right: 8rpx;
 }
 
-.export-btn.secondary-save {
-  background-color: #1C1917;
-  color: #FFFFFF;
-  height: 86rpx;
-  box-shadow: 0 4rpx 16rpx rgba(28, 25, 23, 0.2);
-  font-size: 26rpx;
+.sub-export-row .sub-btn .btn-label-text {
+  font-size: 25rpx;
+  font-weight: 700;
+  color: #1C1917;
+  line-height: 1;
 }
 
-/* 辅助工具：格式转换与压缩 (优雅胶囊卡片) */
+/* 辅助工具：格式转换与压缩 (优雅静音卡片，色彩统一暖纸灰) */
 .converter-utility-card {
   display: flex;
   align-items: center;
@@ -774,7 +816,7 @@
   background-color: #FAF8F5;
   border: 1px solid #EAE6DF;
   border-radius: 999rpx;
-  padding: 16rpx 28rpx;
+  padding: 16rpx 24rpx;
   width: 100%;
   box-sizing: border-box;
   transition: all 0.16s ease;
@@ -789,44 +831,55 @@
   display: flex;
   align-items: center;
   gap: 12rpx;
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
 
 .utility-icon {
-  font-size: 28rpx;
+  font-size: 26rpx;
+  line-height: 1;
   flex-shrink: 0;
+  color: #78716C;
 }
 
 .utility-text-group {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .utility-title {
   font-size: 24rpx;
-  font-weight: 800;
+  font-weight: 700;
   color: #1C1917;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .utility-sub {
   font-size: 20rpx;
   color: #78716C;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .utility-arrow {
   font-size: 22rpx;
   color: #A8A29E;
+  line-height: 1;
   flex-shrink: 0;
 }
 
-/* 底部辅助链接 (与首页完全统一) */
+/* 底部辅助链接 (左右平衡，文字垂直居中，统一暖石墨灰) */
 .aux-links-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8rpx 6rpx 0;
+  padding: 12rpx 4rpx 0;
   border-top: 1px dashed #E7E5E4;
   width: 100%;
   box-sizing: border-box;
@@ -835,11 +888,12 @@
 .aux-link-item {
   font-size: 22rpx;
   font-weight: 600;
-  color: #1C1917;
+  color: #78716C;
   display: flex;
   align-items: center;
   gap: 6rpx;
-  padding: 6rpx 2rpx;
+  padding: 6rpx 4rpx;
+  line-height: 1;
   transition: opacity 0.15s ease;
 }
 
@@ -849,10 +903,20 @@
 
 .aux-link-icon {
   font-size: 24rpx;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.aux-link-text {
+  font-size: 22rpx;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 .aux-link-item.library-link {
-  color: #B45309;
+  color: #78716C;
 }
 
 .aux-link-item.reset-btn {

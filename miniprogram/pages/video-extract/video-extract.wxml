@@ -72,23 +72,18 @@
   <!-- 4. 提取成功结果卡片 (Fresh Master Victory Card，与首页统一规范) -->
   <view wx:elif="{{status === 'success'}}" class="card-panel result-success-card">
     
-    <!-- 头部成功指示行 -->
+    <!-- 头部成功指示行 (左右对齐，绝不错位) -->
     <view class="result-top-badge">
       <view class="result-title-group">
         <text class="success-icon">✓</text>
         <text class="success-title">提取成功！</text>
       </view>
-      <view class="header-right-action">
-        <text class="cost-tag">{{speedDescText}}</text>
-        <view class="repick-btn-pill" bindtap="resetToPicker" hover-class="pill-hover">
-          <text>重选 ↻</text>
-        </view>
-      </view>
+      <text class="cost-tag">{{speedDescText}}</text>
     </view>
 
-    <!-- 视频与提取纯音频体积瘦身对比看板 (Before & After Contrast Board，与格式转换页绝对统一) -->
+    <!-- 视频与提取纯音频体积瘦身对比看板 (极简暖纸风，色彩收敛统一) -->
     <view class="size-comparison-board">
-      <view class="comp-item">
+      <view class="comp-item left">
         <text class="comp-label">原视频大小</text>
         <text class="comp-number">{{videoInfo.sizeText || '原片'}}</text>
         <text class="comp-format-tag">VIDEO</text>
@@ -100,14 +95,14 @@
         <text wx:else class="comp-saved-badge">纯音频</text>
       </view>
 
-      <view class="comp-item highlight">
+      <view class="comp-item right highlight">
         <text class="comp-label">提取纯音频</text>
         <text class="comp-number">{{resultAudio.sizeText}}</text>
         <text class="comp-format-tag accent">{{resultAudio.formatUpper}}</text>
       </view>
     </view>
 
-    <!-- 提取音频元数据标题行 -->
+    <!-- 提取音频元数据标题行 (单行截断，图标标签绝对居中对齐) -->
     <view class="extracted-title-bar">
       <view class="meta-icon-box">🎶</view>
       <view class="meta-content">
@@ -121,17 +116,17 @@
       </view>
     </view>
 
-    <!-- 即时原声高保真试听器 (与首页原声试听完全统一规范) -->
+    <!-- 即时原声高保真试听器 (温暖灰底，平滑滑轨，时间码对称对齐) -->
     <view class="result-audition-box">
       <view class="audition-header-row">
         <view class="audition-title-wrap">
-          <text class="audition-title">🎧 提取完成 · 纯音频原声试听</text>
+          <text class="audition-title">🎧 纯音频原声试听</text>
           <view wx:if="{{isPlaying}}" class="audition-playing-badge">
             <text class="wave-dot-anim"></text>
-            <text class="playing-txt">正在试听中</text>
+            <text class="playing-txt">播放中</text>
           </view>
         </view>
-        <text class="prep-indicator ready">本地就绪 · 零缓冲</text>
+        <text class="prep-indicator ready">零缓冲 · 即点即播</text>
       </view>
 
       <!-- 内联试听播放条 -->
@@ -148,7 +143,7 @@
             value="{{sliderValue}}"
             backgroundColor="#E7E5E4"
             activeColor="#FF6B00"
-            block-size="16"
+            block-size="14"
             block-color="#FF6B00"
             bindchanging="onSliderChanging"
             bindchange="onSliderChange"
@@ -161,28 +156,28 @@
       </view>
     </view>
 
-    <!-- 操作导出按钮组：送入多轨剪辑 + 发好友 / 保存文件 (彻底根除 184px 溢出与折行) -->
+    <!-- 操作导出按钮组：送入多轨剪辑 + 发好友 / 保存文件 (色彩克制统一，排版绝对居中对称) -->
     <view class="result-action-buttons">
-      <!-- 英雄级主按钮：送入多轨剪辑 (全宽 96rpx 药丸按钮) -->
+      <!-- 英雄级主按钮：送入多轨剪辑 (全宽 92rpx 暖橙胶囊，唯一高亮主行动) -->
       <button class="export-btn primary-editor" bindtap="sendToEditor" hover-class="btn-hover-active">
         <text class="btn-icon-emoji">✂️</text>
-        <text>送入多轨剪辑</text>
+        <text class="btn-label-text">送入多轨剪辑</text>
       </button>
 
-      <!-- 双列操作区：发给好友 / 保存至手机 (50/50 严格对齐) -->
+      <!-- 双列操作区：发给好友 / 保存至手机 (双列同质感，高级沉稳 Warm Neutral) -->
       <view class="sub-export-row">
-        <button class="export-btn primary-share" bindtap="shareOrSaveAudio" hover-class="btn-hover-active">
+        <button class="export-btn sub-btn primary-share" bindtap="shareOrSaveAudio" hover-class="btn-hover-active">
           <text class="btn-icon-emoji">🚀</text>
-          <text>发给微信好友</text>
+          <text class="btn-label-text">发给微信好友</text>
         </button>
-        <button class="export-btn secondary-save" bindtap="saveToLocalDisk" hover-class="btn-hover-active">
+        <button class="export-btn sub-btn secondary-save" bindtap="saveToLocalDisk" hover-class="btn-hover-active">
           <text class="btn-icon-emoji">💾</text>
-          <text>保存至手机</text>
+          <text class="btn-label-text">保存至手机</text>
         </button>
       </view>
     </view>
 
-    <!-- 辅助工具：格式转换与压缩 -->
+    <!-- 辅助工具：格式转换与压缩 (优雅静音卡片) -->
     <view class="converter-utility-card" bindtap="sendToConverter" hover-class="utility-hover">
       <view class="utility-left">
         <text class="utility-icon">⚡</text>
@@ -198,11 +193,11 @@
     <view class="aux-links-row">
       <view class="aux-link-item library-link" bindtap="goLibrary">
         <text class="aux-link-icon">📚</text>
-        <text>我的作品 (已自动入库)</text>
+        <text class="aux-link-text">我的作品 (已自动入库)</text>
       </view>
       <view class="aux-link-item reset-btn" bindtap="resetToPicker">
         <text class="aux-link-icon">🔄</text>
-        <text>重新提取</text>
+        <text class="aux-link-text">重新提取</text>
       </view>
     </view>
 
