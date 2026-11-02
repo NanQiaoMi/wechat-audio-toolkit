@@ -428,16 +428,37 @@ Page({
     const sz = Number(size) || 0;
     const fmt = String(format || 'm4a').toLowerCase();
 
-    let speedDesc = `耗时 ${costMs}ms · ${mode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'}`;
+    // 格式化耗时展示：大于等于 1000ms 显示为 X.Xs，小于 1000ms 显示为 Xms
+    const costText = costMs >= 1000 ? `${(costMs / 1000).toFixed(1)}s` : `${costMs}ms`;
+
+    let speedDesc = `耗时 ${costText} · ${mode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'}`;
     if (trafficSavedNotice) {
-      speedDesc = `耗时 ${costMs}ms · 云端极速转码 (${trafficSavedNotice})`;
+      speedDesc = `耗时 ${costText} · 云端极速转码 (${trafficSavedNotice})`;
+    }
+
+    // 自动入库持久化（与格式转换、剪辑工坊保持一致），避免用户退出页面丢失
+    try {
+      const libItem = videoExtractor.buildLibraryItem({
+        title,
+        tempFilePath,
+        fileID,
+        duration: dur,
+        size: sz,
+        format: fmt,
+        sourceVideoName: (this.data.videoInfo && this.data.videoInfo.name) || (this.rawVideoFile && this.rawVideoFile.name) || '',
+      });
+      libraryStore.addItem(libItem);
+    } catch (e) {
+      console.warn('[video-extract] 自动保存到作品库异常:', e);
     }
 
     this.setData({
       status: 'success',
       extractCostMs: costMs,
+      extractCostText: costText,
       extractMode: mode,
       speedDescText: speedDesc,
+      isSavedToLibrary: true,
       resultAudio: {
         title,
         format: fmt,
@@ -645,6 +666,68 @@ Page({
         fail: (err) => {
           if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
           this.fallbackSaveAudio(path);
+        },
+      });
+    } else {
+      this.fallbackSaveAudio(path);
+    }
+  },
+
+  /**
+   * 保存到本地手机或电脑磁盘
+   */
+  saveToLocalDisk() {
+    const path = this.data.resultAudio.tempFilePath;
+    const fileName = `${this.data.resultAudio.title}.${this.data.resultAudio.format}`;
+    if (!path) {
+      wx.showToast({ title: '音频准备中，请稍候', icon: 'none' });
+      return;
+    }
+
+    const sys = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+    const platform = String(sys.platform || '').toLowerCase();
+    const isPC = platform === 'windows' || platform === 'mac' || platform === 'pc';
+
+    if (platform === 'devtools') {
+      wx.showModal({
+        title: '开发者工具不支持保存',
+        content: '微信开发者工具无法直接写入本地文件。请在手机微信中通过“发给微信好友”发送至文件传输助手保存。',
+        showCancel: false,
+      });
+      return;
+    }
+
+    if (isPC) {
+      if (wx.saveFileToDisk) {
+        wx.saveFileToDisk({
+          filePath: path,
+          fileName,
+          success: () => wx.showToast({ title: '已保存到电脑磁盘', icon: 'success' }),
+          fail: err => {
+            const msg = (err && err.errMsg) || '';
+            if (msg.includes('cancel')) return;
+            this.shareOrSaveAudio();
+          },
+        });
+      } else {
+        this.shareOrSaveAudio();
+      }
+      return;
+    }
+
+    // 手机端：通过 shareFileMessage 转发至「文件传输助手」保存
+    if (wx.shareFileMessage) {
+      wx.shareFileMessage({
+        filePath: path,
+        fileName,
+        success: () => wx.showToast({ title: '已转发，请在聊天中保存', icon: 'none' }),
+        fail: err => {
+          if (err && (err.errMsg || '').includes('cancel')) return;
+          wx.showModal({
+            title: '保存指引',
+            content: '请点击“发给微信好友”发送至「文件传输助手」，长按音频即可直接保存到手机本地。',
+            showCancel: false,
+          });
         },
       });
     } else {
