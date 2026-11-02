@@ -14,7 +14,7 @@
 }
 
 .app-container.with-export-bar {
-  padding-bottom: calc(260rpx + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(280rpx + env(safe-area-inset-bottom)) !important;
 }
 
 /* ============================================================
@@ -2266,15 +2266,14 @@ button.zoom-step-btn[disabled] {
   height: 48rpx;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 6rpx;
+  padding: 0 4rpx;
   overflow: hidden;
 }
 
 .cw-bar {
-  flex: 0 0 3rpx;
-  width: 3rpx;
+  flex: 1 1 0%;
   min-width: 2rpx;
-  max-width: 4rpx;
+  margin: 0 1rpx;
   border-radius: 2rpx;
   background-color: #94A3B8;
   height: 40%;
@@ -3110,12 +3109,12 @@ button.zoom-step-btn[disabled] {
   font-size: 24rpx !important;
 }
 
-/* 声音均衡器网格：3列 x 2行 对称排版，6种经典预设，杜绝单项孤儿换行 */
+/* 声音均衡器网格：4列 x 2行 对称排版，8种经典预设，视觉秩序绝对规整 */
 .chips-selector-row.eq-grid,
 .chips-selector-row.wrap.eq-grid {
   display: grid !important;
-  grid-template-columns: repeat(3, 1fr) !important;
-  gap: 12rpx !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 10rpx !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -3126,12 +3125,12 @@ button.zoom-step-btn[disabled] {
   width: 100% !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
-  padding: 16rpx 6rpx !important;
-  font-size: 22rpx !important;
+  padding: 14rpx 4rpx !important;
+  font-size: 21rpx !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 6rpx !important;
+  gap: 4rpx !important;
   white-space: nowrap !important;
 }
 
@@ -3152,6 +3151,44 @@ button.zoom-step-btn[disabled] {
   padding: 16rpx 4rpx !important;
   font-size: 21rpx !important;
   white-space: nowrap !important;
+}
+
+/* 快捷音量增益预设胶囊排 (4列等宽，单点即达) */
+.gain-presets-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 10rpx !important;
+  width: 100% !important;
+  margin-bottom: 12rpx !important;
+  box-sizing: border-box !important;
+}
+
+.gain-preset-pill {
+  background-color: #FAF8F5;
+  border: 1px solid #E7E5E4;
+  border-radius: 999rpx;
+  padding: 10rpx 4rpx;
+  text-align: center;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #78716C;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+}
+
+.gain-preset-pill:active {
+  transform: scale(0.92);
+}
+
+.gain-preset-pill.active {
+  background-color: #FFF7ED;
+  border-color: #FF6B00;
+  color: #FF6B00;
+  font-weight: 800;
+  box-shadow: 0 2rpx 8rpx rgba(255, 107, 0, 0.15);
 }
 
 .sel-chip {
@@ -3631,12 +3668,13 @@ button.nudge-pill-btn:active {
   left: 24rpx;
   right: 24rpx;
   bottom: calc(20rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1.5rpx solid rgba(231, 229, 228, 0.9);
-  border-radius: 38rpx;
-  padding: 16rpx 20rpx 16rpx 28rpx;
+  border: 1.5rpx solid rgba(231, 229, 228, 0.95);
+  border-radius: 44rpx;
+  padding: 14rpx 20rpx 14rpx 24rpx;
+  min-height: 104rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3644,7 +3682,6 @@ button.nudge-pill-btn:active {
   z-index: 100;
   box-shadow: 0 12rpx 36rpx rgba(28, 25, 23, 0.12), 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
   box-sizing: border-box;
-  overflow: hidden;
   animation: springPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -3652,10 +3689,10 @@ button.nudge-pill-btn:active {
 .dock-meta-col {
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
-  flex: 1;
+  gap: 4rpx;
+  flex: 1 1 auto;
   min-width: 0;
-  padding-right: 18rpx;
+  padding-right: 12rpx;
 }
 
 .dock-meta-col:active {
@@ -3795,23 +3832,26 @@ button.nudge-pill-btn:active {
 
 /* 右侧：主导出按键 (强制重置小程序原生 button:not([size='mini']) 的默认尺寸与外边距，杜绝溢出重叠) */
 button.dock-export-action-btn {
+  flex: 0 0 auto !important;
   width: auto !important;
-  margin: 0 !important;
   max-width: 52% !important;
+  min-width: 190rpx !important;
+  height: 74rpx !important;
+  line-height: 74rpx !important;
+  margin: 0 !important;
+  padding: 0 28rpx !important;
   box-sizing: border-box !important;
-  white-space: nowrap;
-  background: #1C1917;
-  color: #FFFFFF;
-  padding: 18rpx 36rpx;
-  border-radius: 999rpx;
-  font-size: 28rpx;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  flex-shrink: 0;
-  box-shadow: 0 6rpx 20rpx rgba(28, 25, 23, 0.22);
+  white-space: nowrap !important;
+  background: #1C1917 !important;
+  color: #FFFFFF !important;
+  border-radius: 999rpx !important;
+  font-size: 26rpx !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8rpx !important;
+  box-shadow: 0 6rpx 20rpx rgba(28, 25, 23, 0.22) !important;
   transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s ease, background-color 0.2s ease;
 }
 

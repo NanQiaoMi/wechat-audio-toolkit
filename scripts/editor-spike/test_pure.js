@@ -501,6 +501,59 @@ const warmPlan = {
 const warmGraph = core.buildFilterGraphV2(warmPlan)
 check('风格EQ：包含 warm 温暖黑胶均衡器参数', warmGraph.indexOf('equalizer=f=350:width_type=h:width=250:g=3,lowpass=f=12000') >= 0)
 
+// 风格 EQ: 影院环绕 (theater)
+const theaterPlan = {
+  sources: [{ fileID: 'c1' }],
+  clips: [{ sourceIndex: 0, in: 0, out: 5, eqPreset: 'theater' }],
+  tracks: [{ id: 'T1' }],
+  volumeDb: 0
+}
+const theaterGraph = core.buildFilterGraphV2(theaterPlan)
+check('风格EQ：包含 theater 影院环绕参数', theaterGraph.indexOf('stereotools=mlev=0.85:slev=1.35') >= 0)
+
+// 风格 EQ: 消除人声 (karaoke)
+const karaokePlan = {
+  sources: [{ fileID: 'c1' }],
+  clips: [{ sourceIndex: 0, in: 0, out: 5, eqPreset: 'karaoke' }],
+  tracks: [{ id: 'T1' }],
+  volumeDb: 0
+}
+const karaokeGraph = core.buildFilterGraphV2(karaokePlan)
+check('风格EQ：包含 karaoke 消除人声参数', karaokeGraph.indexOf('stereotools=mlev=0.08:slev=1.2') >= 0)
+
+// 智能降噪：多阶 FFT 频域降噪
+const denoise3Plan = {
+  sources: [{ fileID: 'c1' }],
+  clips: [{ sourceIndex: 0, in: 0, out: 5, denoise: 3 }],
+  tracks: [{ id: 'T1' }],
+  volumeDb: 0
+}
+check('智能降噪：3dB 采用 afftdn=nr=6:nf=-35', core.buildFilterGraphV2(denoise3Plan).indexOf('afftdn=nr=6:nf=-35') >= 0)
+
+const denoise12Plan = {
+  sources: [{ fileID: 'c1' }],
+  clips: [{ sourceIndex: 0, in: 0, out: 5, denoise: 12 }],
+  tracks: [{ id: 'T1' }],
+  volumeDb: 0
+}
+check('智能降噪：12dB 采用 afftdn=nr=18:nf=-25', core.buildFilterGraphV2(denoise12Plan).indexOf('afftdn=nr=18:nf=-25') >= 0)
+
+// 多轨智能人声避让 (Auto-Ducking)
+const duckingPlan = {
+  sources: [{ fileID: 's0' }, { fileID: 's1' }],
+  clips: [
+    { sourceIndex: 0, in: 0, out: 5, trackId: 'T1' },
+    { sourceIndex: 1, in: 0, out: 4, trackId: 'T2', offsetSec: 2 }
+  ],
+  tracks: [
+    { id: 'T1', name: '人声' },
+    { id: 'T2', name: '伴奏', ducking: true }
+  ],
+  volumeDb: 0
+}
+const duckingGraph = core.buildFilterGraphV2(duckingPlan)
+check('多轨混音：T2 带 volume=-12dB 避让下压', duckingGraph.indexOf('volume=-12dB') >= 0 && duckingGraph.indexOf('trk_T2') >= 0)
+
 // ===========================================================================
 console.log('\n# haptics: 全局触感反馈引擎与防抖节流')
 const haptics = require('../../miniprogram/utils/haptics.js')
@@ -548,8 +601,11 @@ delete global.wx
 // ===========================================================================
 console.log('\n# editorUtils: 时间轴自适应标尺密度与全景毕业')
 const editorUtils = require('../../miniprogram/utils/editor-utils.js')
-eq('EQ_PRESETS 包含 6 种对称预设', editorUtils.EQ_PRESETS.length, 6)
+eq('EQ_PRESETS 包含 8 种对称预设', editorUtils.EQ_PRESETS.length, 8)
 check('EQ_PRESETS 包含 warm 温暖黑胶', editorUtils.getEqPreset('warm').label === '温暖黑胶')
+check('EQ_PRESETS 包含 theater 影院环绕', editorUtils.getEqPreset('theater').label === '影院环绕')
+check('EQ_PRESETS 包含 karaoke 消除人声', editorUtils.getEqPreset('karaoke').label === '消除人声')
+eq('GAIN_PRESETS 包含 4 档快速增益胶囊', editorUtils.GAIN_PRESETS.length, 4)
 
 // 1. 10 分钟超长全景全景测试 (pxPerSec = 1.5, maxTimelineSec = 600)
 const longTrackList = [{ id: 'T1', name: 'A1' }]

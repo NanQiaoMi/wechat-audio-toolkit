@@ -2399,9 +2399,10 @@ smokeTest('声音工具箱非破坏性实时音效调节与均衡器/变速网�
   await wait(80);
   assert.strictEqual(page.data.status, 'editing');
 
-  // 1. 验证 EQ 预设 6 项完整度与倍速选项 6 项完整度
-  assert.strictEqual(page.data.eqPresets.length, 6, 'EQ 预设应包含 6 种预设');
+  // 1. 验证 EQ 预设 8 项完整度与倍速选项 6 项完整度
+  assert.strictEqual(page.data.eqPresets.length, 8, 'EQ 预设应包含 8 种对称预设');
   assert.strictEqual(page.data.speedOptions.length, 6, '倍速应包含 6 种标准速度');
+  assert.strictEqual(page.data.gainPresets.length, 4, '快捷增益应包含 4 档预设');
 
   // 2. 启动播放并在播放中动态切换 EQ 预设
   page.togglePlayClip();
@@ -2431,19 +2432,28 @@ smokeTest('声音工具箱非破坏性实时音效调节与均衡器/变速网�
   assert.strictEqual(page.currentSourceTime, 42.5, '当前播放指针必须保持');
   assert.strictEqual(page.clips[0].volumeDb, 3, '片段音量增益应更新为 3');
 
-  // 5. 复位音量
+  // 5. 快捷增益胶囊与复位音量
+  page.applyQuickGainPreset({ currentTarget: { dataset: { value: 6 } } });
+  assert.strictEqual(page.data.isPlaying, true, '点击快捷增益胶囊后播放必须持续');
+  assert.strictEqual(page.clips[0].volumeDb, 6, '片段音量增益应更新为 +6dB');
+
   page.resetClipGain();
   assert.strictEqual(page.data.isPlaying, true, '复位音量后播放必须持续');
   assert.strictEqual(page.clips[0].volumeDb, 0, '片段音量增益应复位为 0');
 
-  // 6. 淡入淡出调整时不中断播放且保留片段倍速等其他所有参数
-  page.clips[0].speed = 1.25;
+  // 6. 动态热切换倍速：平滑过渡不从头开始且时钟锚点连续
+  page.setClipSpeed({ currentTarget: { dataset: { value: 1.5 } } });
+  assert.strictEqual(page.data.isPlaying, true, '切换倍速必须保持正在播放状态');
+  assert.strictEqual(page.clips[0].speed, 1.5, '片段倍速应更新为 1.5x');
+  assert.strictEqual(page.currentSourceTime, 42.5, '当前播放指针绝不可跳跃回 0 或开头');
+
+  // 7. 淡入淡出调整时不中断播放且保留片段倍速等其他所有参数
   page.applyClipFade('fadeIn', 1.5);
   assert.strictEqual(page.data.isPlaying, true, '调整淡入时保持播放');
   assert.strictEqual(page.clips[0].fadeIn, 1.5);
-  assert.strictEqual(page.clips[0].speed, 1.25, '调整淡入时绝不可丢失已设置的倍速参数');
+  assert.strictEqual(page.clips[0].speed, 1.5, '调整淡入时绝不可丢失已设置的倍速参数');
 
-  // 7. 验证 CSS 契约：3列网格与对称排版
+  // 8. 验证 CSS 契约：3列网格与对称排版
   const editorWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/pages/editor/editor.wxss'), 'utf-8');
   assert.ok(editorWxss.includes('.chips-selector-row.speed-grid'), '必须包含 speed-grid 样式');
   assert.ok(editorWxss.includes('.chips-selector-row.eq-grid'), '必须包含 eq-grid 样式');
