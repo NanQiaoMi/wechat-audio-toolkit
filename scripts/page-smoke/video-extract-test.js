@@ -766,6 +766,12 @@ async function runAll() {
       setData(patch) { Object.assign(this.data, patch); },
     });
 
+    page.data.videoInfo = {
+      name: '原电影.mp4',
+      size: 150 * 1024 * 1024,
+      sizeText: '150.0 MB',
+    };
+
     // 模拟应用云端 14259ms 转码结果
     page.applyExtractionResult({
       title: '电影原声片段',
@@ -779,8 +785,9 @@ async function runAll() {
     });
 
     assert.strictEqual(page.data.status, 'success');
-    assert.strictEqual(page.data.extractCostText, '14.3s', '14259ms 必须格式化为 14.3s');
-    assert.ok(page.data.speedDescText.indexOf('14.3s') >= 0, 'speedDescText 必须包含 14.3s 而非生硬 ms');
+    assert.ok(page.data.extractCostText.indexOf('14.3') >= 0, '14259ms 必须格式化为 14.3 秒或 14.3s');
+    assert.ok(page.data.speedDescText.indexOf('14.3') >= 0, 'speedDescText 必须包含 14.3 而非生硬 ms');
+    assert.strictEqual(page.data.savedRatio, 98, '150MB 降至 3.1MB 瘦身比必须约为 98%');
     assert.strictEqual(page.data.isSavedToLibrary, true, '提取成功必须自动沉淀至作品库');
 
     // 检查本地 < 1000ms 格式化
@@ -853,11 +860,21 @@ async function runAll() {
     assert.ok(wxml.indexOf('converter-utility-card') >= 0, 'wxml 必须包含转格式卡片 converter-utility-card');
     assert.ok(wxml.indexOf('aux-links-row') >= 0, 'wxml 必须包含底部辅助链接 aux-links-row');
 
-    // 验证样式表包含关键样式
+    // 验证样式表包含关键样式与设计规范统一
     assert.ok(wxss.indexOf('.export-btn.primary-editor') >= 0, 'wxss 必须定义 primary-editor');
     assert.ok(wxss.indexOf('.sub-export-row') >= 0, 'wxss 必须定义 sub-export-row');
     assert.ok(wxss.indexOf('.converter-utility-card') >= 0, 'wxss 必须定义 converter-utility-card');
     assert.ok(wxss.indexOf('.aux-links-row') >= 0, 'wxss 必须定义 aux-links-row');
+
+    // 验证与首页格式转换看板、试听盒与按钮规范统一
+    assert.ok(wxml.indexOf('size-comparison-board') >= 0, 'wxml 必须包含体积瘦身看板 size-comparison-board');
+    assert.ok(wxss.indexOf('.size-comparison-board') >= 0, 'wxss 必须包含体积瘦身看板样式 .size-comparison-board');
+    assert.ok(wxml.indexOf('result-audition-box') >= 0, 'wxml 必须包含试听播放盒 result-audition-box');
+    assert.ok(wxss.indexOf('.result-audition-box') >= 0, 'wxss 必须包含试听播放盒样式 .result-audition-box');
+
+    // 验证 app.wxss 全局消除微信 184px button 溢出缺陷
+    const appWxss = fs.readFileSync(path.join(__dirname, '../../miniprogram/app.wxss'), 'utf8');
+    assert.ok(appWxss.indexOf("button:not([size='mini'])") >= 0, 'app.wxss 必须重置 button:not([size=mini]) 规避 184px 溢出');
   });
 
   console.log('\n============================================');

@@ -26,6 +26,13 @@ button {
   border: none;
   font-family: inherit;
   line-height: inherit;
+  box-sizing: border-box;
+}
+
+button:not([size='mini']) {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 button:focus {

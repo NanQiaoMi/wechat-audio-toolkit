@@ -428,12 +428,19 @@ Page({
     const sz = Number(size) || 0;
     const fmt = String(format || 'm4a').toLowerCase();
 
-    // 格式化耗时展示：大于等于 1000ms 显示为 X.Xs，小于 1000ms 显示为 Xms
-    const costText = costMs >= 1000 ? `${(costMs / 1000).toFixed(1)}s` : `${costMs}ms`;
+    // 格式化耗时展示：大于等于 1000ms 显示为 X.X 秒，小于 1000ms 显示为 Xms
+    const costText = costMs >= 1000 ? `${(costMs / 1000).toFixed(1)} 秒` : `${costMs}ms`;
 
     let speedDesc = `耗时 ${costText} · ${mode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'}`;
     if (trafficSavedNotice) {
       speedDesc = `耗时 ${costText} · 云端极速转码 (${trafficSavedNotice})`;
+    }
+
+    // 计算体积瘦身百分比
+    const origSize = (this.data.videoInfo && this.data.videoInfo.size) || (this.rawVideoFile && this.rawVideoFile.size) || 0;
+    let savedRatio = 0;
+    if (origSize > sz && origSize > 0) {
+      savedRatio = Math.max(0, Math.min(99, Math.round((1 - sz / origSize) * 100)));
     }
 
     // 自动入库持久化（与格式转换、剪辑工坊保持一致），避免用户退出页面丢失
@@ -458,6 +465,7 @@ Page({
       extractCostText: costText,
       extractMode: mode,
       speedDescText: speedDesc,
+      savedRatio,
       isSavedToLibrary: true,
       resultAudio: {
         title,
