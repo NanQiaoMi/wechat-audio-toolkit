@@ -2166,6 +2166,60 @@ smokeTest('格式转换完成界面优化与纯音频资源直通：sendConverte
   page.onUnload();
 });
 
+smokeTest('播放时钟高精物理插值引擎：全片播放时间码连续递增、多片段无突跳与硬件微调校准', async () => {
+  const stub = createWxStub({});
+  const page = loadEditorPage(stub.wx);
+  page.onLoad();
+  await wait(50);
+
+  // 1. 模拟包含 2 个已裁剪片段的单轨工程
+  page.sources = [
+    { id: 's1', name: '原声A.mp3', duration: 60, localPath: 'wxfile://tmp/a.mp3', playable: true },
+    { id: 's2', name: '原声B.mp3', duration: 40, localPath: 'wxfile://tmp/b.mp3', playable: true },
+  ];
+  page.clips = [
+    { id: 'c1', sourceId: 's1', in: 10, out: 20, trackId: 'T1', offsetSec: 0, speed: 1.0 }, // 10s 长，时间轴 0~10s
+    { id: 'c2', sourceId: 's2', in: 5, out: 15, trackId: 'T1', offsetSec: 10, speed: 1.0 },  // 10s 长，时间轴 10~20s
+  ];
+  page.refreshClipData();
+
+  // 2. 启动「播放全部」
+  await page.startPlayback('all');
+  assert.strictEqual(page.data.isPlaying, true);
+  assert.strictEqual(page.data.playMode, 'all');
+
+  // 3. 初始状态时间码与红针验证
+  assert.strictEqual(page.data.currentTimeText, '00:00.0');
+  assert.strictEqual(page.data.timelineData.playheadRpx, 0);
+
+  // 4. 模拟经过 100ms（音频播放器已进入片段内时间 10.1s）
+  page.sourceAudio.currentTime = 10.1;
+  page._playbackWallStart = Date.now() - 100;
+  page.tickPlayback();
+  assert.strictEqual(page.data.currentTimeText, '00:00.1');
+
+  // 5. 模拟进入第二段（例如时间轴 12.5s 处，对应源 B 的 in(5) + 2.5 = 7.5s）
+  page.playback.index = 1;
+  page.sourceAudio.currentTime = 7.5;
+  page._playbackWallStart = Date.now() - 2500;
+  page._playbackStartSourceTime = 5;
+  page._playbackStartTimelineSec = 10;
+  page.tickPlayback();
+
+  // 关键断言：全片播放时，时间码必须连续显示成片时间 00:12.5，绝不能突跳回片段内源时间 00:07.5！
+  assert.strictEqual(page.data.currentTimeText, '00:12.5', '全片播放时时间码必须连续显示时间轴成片时间');
+  assert.ok(page.data['timelineData.playheadRpx'] > 0);
+
+  // 6. 模拟硬件时间漂移（如音频硬件报告已播放至 7.8s，漂移 300ms）
+  page.sourceAudio.currentTime = 7.8;
+  page.tickPlayback();
+  assert.ok(page.data.isPlaying);
+
+  page.stopPlayback();
+  assert.strictEqual(page.data.isPlaying, false);
+  page.onUnload();
+});
+
 /* ========================================================================== */
 /* 汇总                                                                       */
 /* ========================================================================== */

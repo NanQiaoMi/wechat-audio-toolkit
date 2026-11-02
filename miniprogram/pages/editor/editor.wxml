@@ -161,7 +161,7 @@
       <view class="waveform-header">
         <view class="time-readout">
           <text class="time-main">{{currentTimeText}}</text>
-          <text class="time-total"> / {{totalDurationText}}</text>
+          <text class="time-total"> / {{playMode === 'all' ? planDurationText : totalDurationText}}</text>
         </view>
         <view class="clip-locator-badge">
           <text>{{selectedClip.trackId || 'A1'}} 轨 · 第 {{selectedClipIndex + 1}}/{{clipCount}} 段 · {{selectedClip.durationText}}</text>

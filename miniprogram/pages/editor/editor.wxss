@@ -2372,6 +2372,7 @@ button.zoom-step-btn[disabled] {
   z-index: 25;
   pointer-events: none;
   transform: translateX(-50%);
+  will-change: left;
 }
 
 .playhead-cap {
