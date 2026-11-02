@@ -689,10 +689,20 @@ function buildFilterGraphV2(plan) {
       chain.push('treble=g=5:f=6000')
     } else if (clip.eqPreset === 'warm') {
       chain.push('equalizer=f=350:width_type=h:width=250:g=3,lowpass=f=12000')
+    } else if (clip.eqPreset === 'theater') {
+      chain.push('aformat=channel_layouts=stereo,stereotools=mlev=0.85:slev=1.35,bass=g=3:f=100,treble=g=3:f=8000')
+    } else if (clip.eqPreset === 'karaoke') {
+      chain.push('aformat=channel_layouts=stereo,stereotools=mlev=0.08:slev=1.2,highpass=f=120')
     }
-    // ③ 智能降噪
+    // ③ 智能降噪（多阶分贝 FFT 频域降噪与低频陷波滤波）
     if (clip.denoise && clip.denoise > 0) {
-      chain.push('highpass=f=80,lowpass=f=12000')
+      if (clip.denoise >= 12) {
+        chain.push('highpass=f=90,afftdn=nr=18:nf=-25')
+      } else if (clip.denoise >= 6) {
+        chain.push('highpass=f=80,afftdn=nr=12:nf=-30')
+      } else {
+        chain.push('highpass=f=80,afftdn=nr=6:nf=-35')
+      }
     }
     // ④ 片段增益
     if (clip.volumeDb && Math.abs(clip.volumeDb) > 0.05) {
@@ -751,6 +761,13 @@ function buildFilterGraphV2(plan) {
           const volLabel = currentLabel + '_v'
           parts.push('[' + currentLabel + ']volume=' + fmtSec(tDef.volumeDb) + 'dB[' + volLabel + ']')
           currentLabel = volLabel
+        }
+
+        // 若该轨开启了智能人声避让 (Auto-Ducking，伴奏遇人声下压 -12dB)
+        if (tDef && tDef.ducking) {
+          const duckLabel = currentLabel + '_k'
+          parts.push('[' + currentLabel + ']volume=-12dB[' + duckLabel + ']')
+          currentLabel = duckLabel
         }
 
         trackOutputs.push('[' + currentLabel + ']')

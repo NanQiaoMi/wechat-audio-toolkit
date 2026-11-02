@@ -140,6 +140,7 @@ Page({
     selectedClipGainText: '0 dB',
     speedOptions: editorUtils.SPEED_OPTIONS,
     eqPresets: editorUtils.EQ_PRESETS,
+    gainPresets: editorUtils.GAIN_PRESETS,
     denoiseOptions: editorUtils.DENOISE_OPTIONS,
     zoomLevels: editorUtils.ZOOM_LEVELS,
     zoomLevelRatioText: '100%',
@@ -2883,25 +2884,48 @@ Page({
 
     // 若当前正在播放，热更新播放速率，平滑过渡而不中断或倒退至开头！
     if (this.data.isPlaying) {
+      const currentSource = this.currentSourceTime;
       this._playbackSpeed = val;
-      if (this.sourceAudio && typeof this.sourceAudio.playbackRate !== 'undefined') {
-        try { this.sourceAudio.playbackRate = val; } catch (e) {}
+
+      if (this.sourceAudio) {
+        try {
+          this.sourceAudio.startTime = currentSource;
+          if (typeof this.sourceAudio.playbackRate !== 'undefined') {
+            this.sourceAudio.playbackRate = val;
+          }
+          this.sourceAudio.seek(currentSource);
+        } catch (e) {}
       }
+
       if (this.trackAudioPool) {
         Object.keys(this.trackAudioPool).forEach(id => {
           const a = this.trackAudioPool[id];
-          if (a && typeof a.playbackRate !== 'undefined') {
-            try { a.playbackRate = val; } catch (e) {}
+          if (a) {
+            try {
+              if (typeof a.playbackRate !== 'undefined') {
+                a.playbackRate = val;
+              }
+            } catch (e) {}
           }
         });
       }
-      if (this.playback && this.playback.queue && this.playback.queue[this.playback.index]) {
-        this.playback.queue[this.playback.index].speed = val;
+
+      if (this.playback) {
+        const built = editorUtils.buildPreviewQueue(this.clips, this.sources);
+        if (built.ok) {
+          this.playback.queue = built.queue;
+        }
+        const newTimelinePos = editorUtils.queueOutputPosition(this.playback.queue, this.playback.index, currentSource);
+        this._playbackWallStart = Date.now();
+        this._playbackStartSourceTime = currentSource;
+        this._playbackStartTimelineSec = newTimelinePos;
+        this._lastDisplayTime = null;
       }
-      // 重置高精物理时钟锚点，保持当前播放时码连续无突跳
-      this._playbackWallStart = Date.now();
-      this._playbackStartSourceTime = this.currentSourceTime;
-      this._playbackStartTimelineSec = this.data.currentTimelineSec;
+
+      if (this.isMultiTrackPlaying) {
+        this.multiTrackWallStartTime = Date.now();
+        this.multiTrackStartTimelineSec = this.currentSourceTime;
+      }
     }
 
     this.refreshClipData();
@@ -2998,6 +3022,30 @@ Page({
     }
     haptics.impactLight();
     wx.showToast({ title: '增益已复位 (0 dB)', icon: 'none' });
+  },
+
+  applyQuickGainPreset(e) {
+    const val = Number(e.currentTarget.dataset.value);
+    if (!isFinite(val)) return;
+    const clip = this.getSelectedClip();
+    if (!clip) return;
+    this.pushUndo();
+    this.clips[this.selectedClipIndex].volumeDb = val;
+    if (this.playback && this.playback.queue) {
+      this.playback.queue.forEach(item => {
+        if (item.clipId === clip.id) item.volumeDb = val;
+      });
+    }
+    this.setData({
+      selectedClipGainDb: val,
+      selectedClipGainText: editorUtils.formatDb(val),
+    });
+    this.refreshClipData();
+    if (this.data.isPlaying) {
+      this.applyPreviewVolume(this.currentSourceTime);
+    }
+    haptics.impactLight();
+    wx.showToast({ title: `增益：${editorUtils.formatDb(val)}`, icon: 'none' });
   },
 
   nudgeClipOffset(e) {
@@ -3536,10 +3584,12 @@ Page({
         for (let i = 0; i < built.queue.length; i++) {
           const item = built.queue[i];
           const startOut = editorUtils.queueOutputPosition(built.queue, i, item.in);
-          const endOut = startOut + item.duration;
+          const sp = item.speed && item.speed > 0 ? item.speed : 1.0;
+          const effectiveDur = item.effectiveDuration || (item.duration / sp);
+          const endOut = startOut + effectiveDur;
           if (this.currentSourceTime >= startOut && this.currentSourceTime < endOut - 0.05) {
             startIndex = i;
-            startOffset = item.in + (this.currentSourceTime - startOut);
+            startOffset = item.in + (this.currentSourceTime - startOut) * sp;
             startTimelinePos = this.currentSourceTime;
             break;
           }
@@ -3831,7 +3881,6 @@ Page({
     // 1. 基于高精度物理时钟连续递增（微秒级插值）
     const elapsed = Math.max(0, (now - this._playbackWallStart) / 1000 * (this._playbackSpeed || 1.0));
     let continuousSourceTime = this._playbackStartSourceTime + elapsed;
-    let continuousTimelineSec = this._playbackStartTimelineSec + elapsed;
 
     // 2. 硬件时钟软对齐 (Soft PLL Anchor Slew)：
     // 微信底层 InnerAudioContext.currentTime 具有 250ms~400ms 的原生离散阶梯延迟。
@@ -3849,14 +3898,8 @@ Page({
     // 3. 严格单调性保证（Strict Monotonicity）：
     // 在播放进行中，时间码决不能倒退！
     if (typeof this._lastDisplayTime === 'number' && isFinite(this._lastDisplayTime)) {
-      if (pb.mode === 'all') {
-        if (continuousTimelineSec < this._lastDisplayTime) {
-          continuousTimelineSec = this._lastDisplayTime;
-        }
-      } else {
-        if (continuousSourceTime < this._lastDisplayTime) {
-          continuousSourceTime = this._lastDisplayTime;
-        }
+      if (pb.mode !== 'all' && continuousSourceTime < this._lastDisplayTime) {
+        continuousSourceTime = this._lastDisplayTime;
       }
     }
 
@@ -3869,10 +3912,11 @@ Page({
     this.currentSourceTime = editorUtils.clampNumber(continuousSourceTime, item.in, item.out);
     this.applyPreviewVolume(this.currentSourceTime);
 
-    // 5. 计算成片时间轴位置与标尺红针坐标
-    const outputSec = pb.mode === 'all'
-      ? continuousTimelineSec
-      : editorUtils.queueOutputPosition(pb.queue, pb.index, this.currentSourceTime);
+    // 5. 计算成片时间轴位置与标尺红针坐标（严格与当前片段速率对齐）
+    let outputSec = editorUtils.queueOutputPosition(pb.queue, pb.index, this.currentSourceTime);
+    if (pb.mode === 'all' && typeof this._lastDisplayTime === 'number' && isFinite(this._lastDisplayTime) && outputSec < this._lastDisplayTime) {
+      outputSec = this._lastDisplayTime;
+    }
     const pxPerSec = (this.data.timelineData && this.data.timelineData.pxPerSec) || 36;
     const playheadRpx = Math.round(outputSec * pxPerSec);
     const windowWidth = this.windowWidth || 375;
@@ -4298,6 +4342,10 @@ Page({
         amp = 0.28 + 0.14 * Math.abs(Math.sin(i * 0.7));
       }
       const inside = centerT >= inT && centerT <= outT;
+      if (inside && clip && typeof clip.volumeDb === 'number' && clip.volumeDb !== 0) {
+        const gainScale = editorUtils.clampNumber(editorUtils.dbToGain(clip.volumeDb), 0.25, 1.8);
+        amp = Math.min(1.0, amp * gainScale);
+      }
       const barHeight = Math.max(2, amp * innerH);
       ctx.fillStyle = inside ? '#FF6B00' : '#E7E5E4';
       ctx.fillRect(x, midY - barHeight / 2, Math.max(1, colW - 1), barHeight);

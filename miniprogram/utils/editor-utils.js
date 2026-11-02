@@ -40,7 +40,16 @@ var EQ_PRESETS = [
   { key: 'radio', label: '复古电台', icon: '📻', desc: '带通滤波模拟经典收音机与老电话' },
   { key: 'bass', label: '澎湃低音', icon: '🎧', desc: '增强 80~120Hz 律动与低频厚度' },
   { key: 'treble', label: '明亮空气', icon: '✨', desc: '提升 6~10kHz 高频，清脆通透' },
-  { key: 'warm', label: '温暖黑胶', icon: '💿', desc: '提升温暖中低频，抚平高频毛刺与燥感' }
+  { key: 'warm', label: '温暖黑胶', icon: '💿', desc: '提升温暖中低频，抚平高频毛刺与燥感' },
+  { key: 'theater', label: '影院环绕', icon: '🎬', desc: '立体声拓宽与高低频微增强，营造大空间临场感' },
+  { key: 'karaoke', label: '消除人声', icon: '🎤', desc: '中置声道相消，抑制主唱人声保留立体声伴奏' }
+];
+
+var GAIN_PRESETS = [
+  { val: -6, label: '-6dB 伴奏' },
+  { val: 0, label: '0dB 标准' },
+  { val: 3, label: '+3dB 人声' },
+  { val: 6, label: '+6dB 增强' }
 ];
 
 var DENOISE_OPTIONS = [
@@ -781,11 +790,10 @@ function buildTimelineData(tracks, clips, sources, zoomScale, selectedClipIndex,
     var widthRpx = Math.max(minWidthRpx, Math.round(effectiveDur * pxPerSec));
     var leftRpx = Math.round(startSec * pxPerSec);
     var src = sMap[cv.sourceId];
-    // 密集波形：常态自适应满铺，全幅延展无留白；双指缩放手势期间自适应轻量化(最高36柱)，保障 60FPS 极速手势响应
-    var barPitchRpx = 8;
+    // 密集波形：常态自适应满铺，全幅延展无留白；双指缩放手势期间自适应轻量化(最高28柱)，保障 60FPS 极速手势响应
     var dynamicBarCount = isPinching
       ? Math.max(8, Math.min(28, Math.floor(widthRpx / 16)))
-      : Math.max(20, Math.min(360, Math.floor(widthRpx / barPitchRpx)));
+      : Math.max(24, Math.min(160, Math.floor(widthRpx / 10)));
     var dynamicWaveBars = sliceClipWaveBars(src, cv.in, cv.out, dynamicBarCount);
 
     var item = Object.assign({}, cv, {
@@ -1238,6 +1246,7 @@ module.exports = {
   TRACK_DEFS: TRACK_DEFS,
   SPEED_OPTIONS: SPEED_OPTIONS,
   EQ_PRESETS: EQ_PRESETS,
+  GAIN_PRESETS: GAIN_PRESETS,
   DENOISE_OPTIONS: DENOISE_OPTIONS,
   ZOOM_LEVELS: ZOOM_LEVELS,
   getEqPreset: getEqPreset,

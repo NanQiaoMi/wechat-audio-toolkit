@@ -826,6 +826,18 @@
               <text class="reset-gain-btn" bindtap="resetClipGain">复位</text>
             </view>
           </view>
+          <!-- 快捷增益预设胶囊排 -->
+          <view class="gain-presets-row">
+            <view
+              wx:for="{{gainPresets}}"
+              wx:key="val"
+              class="gain-preset-pill {{selectedClipGainDb === item.val ? 'active' : ''}}"
+              data-value="{{item.val}}"
+              bindtap="applyQuickGainPreset"
+            >
+              <text>{{item.label}}</text>
+            </view>
+          </view>
           <slider
             class="custom-slider"
             min="-24"
@@ -992,6 +1004,18 @@
                 <view class="gain-action-group">
                   <text class="section-val highlight">{{selectedClipGainText}}</text>
                   <text class="reset-gain-btn" bindtap="resetClipGain">复位0dB</text>
+                </view>
+              </view>
+              <!-- 快捷增益预设胶囊排 -->
+              <view class="gain-presets-row">
+                <view
+                  wx:for="{{gainPresets}}"
+                  wx:key="val"
+                  class="gain-preset-pill {{selectedClipGainDb === item.val ? 'active' : ''}}"
+                  data-value="{{item.val}}"
+                  bindtap="applyQuickGainPreset"
+                >
+                  <text>{{item.label}}</text>
                 </view>
               </view>
               <slider
@@ -1312,8 +1336,9 @@
           </view>
         </view>
 
-        <!-- 右侧：高质感主导出操作按钮 -->
+        <!-- 右侧：高质感主导出操作按钮 (size="mini" 防原生 184px 溢出撑爆布局) -->
         <button
+          size="mini"
           class="dock-export-action-btn {{exportDisabled ? 'disabled' : ''}}"
           disabled="{{exportDisabled}}"
           bindtap="startExport"
