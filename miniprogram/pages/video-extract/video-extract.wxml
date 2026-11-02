@@ -33,8 +33,13 @@
         </button>
         <button class="secondary-picker-btn" bindtap="chooseMessageVideo" hover-class="picker-btn-hover">
           <text class="picker-btn-icon">💬</text>
-          <text class="picker-btn-label">从微信聊天会话选取</text>
+          <text class="picker-btn-label">从微信聊天会话选取（推荐）</text>
         </button>
+      </view>
+
+      <view class="picker-tip-box">
+        <text class="tip-icon">💡</text>
+        <text class="tip-text">提示：部分手机相册视频（如高画质/杜比/多声道）受微信底层转码限制会提示“解码失败”，此时请将视频发至「文件传输助手」，点击上方「从微信聊天会话选取」，可 100% 避开相册压缩直接秒级提取！</text>
       </view>
 
       <view class="picker-spec-capsule">

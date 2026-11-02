@@ -103,8 +103,9 @@ Page({
     });
 
     ctx.onError((err) => {
+      console.warn('[video-extract] 音频播放器报错:', err);
       this.setData({ isPlaying: false });
-      wx.showToast({ title: '播放失败，音频解码异常', icon: 'none' });
+      wx.showToast({ title: '播放失败，音频格式异常', icon: 'none' });
     });
 
     this.audioCtx = ctx;
@@ -120,8 +121,9 @@ Page({
       wx.chooseMedia({
         count: 1,
         mediaType: ['video'],
-        sourceType: ['album', 'camera'],
-        sizeType: ['original'], // 【关键】强制原视频，完全绕过微信客户端原生压缩与脆弱解码导致的“压缩中/音频解码失败”
+        sourceType: ['album'], // 纯相册，直接调起相册选取
+        sizeType: ['original'], // 请求原视频
+        compressed: false, // 【微信官方 2.25.0+ 关键属性】显式声明不压缩视频
         success: (res) => {
           const item = res && res.tempFiles && res.tempFiles[0];
           if (!item) return;
@@ -136,21 +138,22 @@ Page({
         fail: (err) => {
           if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
           console.warn('[video-extract] chooseMedia 失败:', err);
-          const errMsg = String(err && (err.errMsg || err.message || JSON.stringify(err)) || '').toLowerCase();
-          if (errMsg.indexOf('decode') >= 0 || errMsg.indexOf('codec') >= 0 || errMsg.indexOf('compress') >= 0) {
-            wx.showModal({
-              title: '相册视频读取异常',
-              content: '微信原生相册组件解析该视频异常。建议在相册选择时取消压缩，或尝试使用「从聊天会话选择」选取视频原文件。',
-              showCancel: false,
-            });
-          } else {
-            wx.showToast({ title: '选取视频失败', icon: 'none' });
-          }
+          wx.showModal({
+            title: '相册转码受限',
+            content: '该视频触发了微信相册底层转码限制（通常因包含杜比/多声道/高码率音轨）。\n\n建议点击下方【从聊天会话选取】，直接在微信聊天记录或「文件传输助手」中选择该视频，100% 避开相册压缩直接秒级提取！',
+            confirmText: '从聊天选取',
+            cancelText: '取消',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                this.chooseMessageVideo();
+              }
+            },
+          });
         },
       });
     } else if (wx.chooseVideo) {
       wx.chooseVideo({
-        sourceType: ['album', 'camera'],
+        sourceType: ['album'],
         compressed: false, // 【关键】禁用微信原生压缩，规避原生压缩器解码失败
         success: (res) => {
           this.handleSelectedVideo({
@@ -164,14 +167,24 @@ Page({
         fail: (err) => {
           if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
           console.warn('[video-extract] chooseVideo 失败:', err);
-          wx.showToast({ title: '选取视频失败', icon: 'none' });
+          wx.showModal({
+            title: '相册转码受限',
+            content: '该视频触发了微信相册转码限制，建议使用「从微信聊天会话选取」。',
+            confirmText: '从聊天选取',
+            cancelText: '取消',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                this.chooseMessageVideo();
+              }
+            },
+          });
         },
       });
     }
   },
 
   /**
-   * 通道 2：从微信聊天会话选择视频
+   * 通道 2：从微信聊天会话选择视频（100% 绕过微信相册压缩，直读原文件）
    */
   chooseMessageVideo() {
     if (typeof wx === 'undefined' || typeof wx.chooseMessageFile !== 'function') {
@@ -181,7 +194,7 @@ Page({
 
     wx.chooseMessageFile({
       count: 1,
-      type: 'video',
+      type: 'all', // 允许从微信聊天记录、文件传输助手选择视频或文件，彻底突破相册压缩
       success: (res) => {
         const item = res && res.tempFiles && res.tempFiles[0];
         if (!item) return;
