@@ -284,7 +284,10 @@ function extractAudioLocally(videoFilePath, options = {}) {
                     success: false,
                     mode: 'local',
                     fallbackToCloud: true,
-                    reason: '本地解封装音轨编码特殊（如杜比/高码率/视频容器封装），当前手机播放器无法直接解码，正在自动切换云端 FFmpeg 强力转码',
+                    localAudioFilePath: safeAudioPath,
+                    localAudioSize: actualSize,
+                    duration: trackDur,
+                    reason: '本地解封装音轨编码特殊（如杜比/高码率/视频容器封装），当前手机播放器无法直接解码，已提取轻量纯音轨并自动切换云端 FFmpeg 快速转码',
                   });
                   return;
                 }

@@ -77,7 +77,7 @@
       <view class="result-check-badge">✓</view>
       <view class="result-title-group">
         <text class="result-headline">音频提取成功</text>
-        <text class="result-speed-tag">耗时 {{extractCostMs}}ms · {{extractMode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'}}</text>
+        <text class="result-speed-tag">{{speedDescText || ('耗时 ' + extractCostMs + 'ms · ' + (extractMode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'))}}</text>
       </view>
       <view class="repick-btn" bindtap="resetToPicker" hover-class="btn-hover">
         <text>重选</text>
