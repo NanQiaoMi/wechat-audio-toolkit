@@ -613,6 +613,8 @@ function createWxStub(options) {
     showLoading() {},
     hideLoading() {},
     showToast(payload) { calls.toast.push(payload); },
+    navigateTo(payload) { (calls.navigateTo = calls.navigateTo || []).push(payload); },
+    redirectTo(payload) { (calls.redirectTo = calls.redirectTo || []).push(payload); },
     showModal(payload) {
       calls.modal.push(payload);
       if (opts.modalConfirm !== undefined && payload.success) {
@@ -1811,7 +1813,8 @@ smokeTest('音频切开重叠自动下移至下一音轨与重复分段仅展现
 
 function loadIndexPage(wxStub) {
   global.wx = wxStub;
-  global.getApp = () => ({ globalData: {} });
+  const sharedApp = { globalData: {} };
+  global.getApp = () => sharedApp;
   let captured = null;
   global.Page = (config) => {
     captured = config;
@@ -2111,6 +2114,55 @@ smokeTest('选中片段控制中枢布局与双端修剪仪表盘：无折行对
   page.nudgeClipTail({ currentTarget: { dataset: { delta: -0.2 } } });
   assert.strictEqual(page.clips[0].out, 59.8, '出点应精确微调 -0.2s');
 
+  page.onUnload();
+});
+
+smokeTest('格式转换完成界面优化与纯音频资源直通：sendConvertedToEditor、作品库联动与音视频格式兼容', async () => {
+  const indexWxml = read(path.join(__dirname, '../../miniprogram/pages/index/index.wxml'));
+  const indexWxss = read(path.join(__dirname, '../../miniprogram/pages/index/index.wxss'));
+
+  // 1. 验证 WXML 具备新版送入剪辑与我的作品入库导航
+  assert.ok(indexWxml.indexOf('sendConvertedToEditor') >= 0, 'index.wxml 必须包含送入多轨剪辑按钮');
+  assert.ok(indexWxml.indexOf('primary-editor') >= 0, '必须包含 primary-editor 样式');
+  assert.ok(indexWxml.indexOf('library-link') >= 0, '必须包含我的作品快速入库链接');
+  assert.ok(indexWxss.indexOf('.primary-editor') >= 0, 'WXSS 必须定义 .primary-editor 样式');
+
+  // 2. 模拟 index 页面逻辑执行
+  const stub = createWxStub();
+  const page = loadIndexPage(stub.wx);
+  page.onLoad();
+
+  assert.ok(typeof page.sendConvertedToEditor === 'function', 'index.js 必须实现 sendConvertedToEditor');
+
+  page.setData({
+    sourceFile: { name: '演讲原声.mp4', size: 10 * 1024 * 1024 },
+    convertResult: {
+      fileID: 'cloud://bucket/converted_audios/lecture.mp3',
+      targetFormat: 'mp3',
+      targetSize: 2 * 1024 * 1024,
+    },
+    resultTempFilePath: 'wxfile://tmp/lecture.mp3',
+  });
+
+  // 执行送入多轨剪辑
+  page.sendConvertedToEditor();
+  assert.strictEqual(stub.calls.navigateTo.length, 1, '必须跳转到多轨剪辑工坊');
+  assert.strictEqual(stub.calls.navigateTo[0].url, '/pages/editor/editor');
+
+  const appInstance = getApp();
+  assert.ok(appInstance.globalData.pendingAudio, '必须向全局写入 pendingAudio');
+  assert.strictEqual(appInstance.globalData.pendingAudio.name, '演讲原声.mp3');
+  assert.strictEqual(appInstance.globalData.pendingAudio.extName, 'MP3');
+  assert.strictEqual(appInstance.globalData.pendingAudio.from, 'audio-convert');
+  assert.strictEqual(appInstance.globalData.pendingAudio.path, 'wxfile://tmp/lecture.mp3');
+
+  // 验证剪辑工坊 onLoad 能自动消费该纯音频资源
+  const editorPage = loadEditorPage(stub.wx);
+  editorPage.onLoad();
+  assert.strictEqual(appInstance.globalData.pendingAudio, null, '剪辑工坊进入时必须成功消费并清空 pendingAudio');
+
+  await wait(120);
+  editorPage.onUnload();
   page.onUnload();
 });
 

@@ -531,7 +531,7 @@ async function convertFile(event) {
       }
     }
 
-    const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', inputPath, ...TARGETS[targetFormat]]
+    const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', inputPath, '-vn', ...TARGETS[targetFormat]]
     if (targetFormat !== 'wav') {
       if (['mp3','m4a','aac','ogg'].includes(targetFormat)) args.push('-b:a', bitrate)
     }

@@ -326,8 +326,8 @@ Page({
     this.stopAllAudio();
     wx.chooseMessageFile({
       count: 1,
-      type: 'file',
-      extension: ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'amr', 'wma', 'ape'],
+      type: 'all',
+      extension: ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'amr', 'wma', 'ape', 'mp4', 'mov'],
       success: res => {
         if (!res.tempFiles || res.tempFiles.length === 0) return;
         const file = res.tempFiles[0];
@@ -910,6 +910,46 @@ Page({
     } catch (e) {
       console.warn('保存作品库失败', e);
     }
+  },
+
+  sendConvertedToEditor() {
+    this.stopAllAudio();
+    if (!this.data.convertResult) {
+      wx.showToast({ title: '音频未就绪', icon: 'none' });
+      return;
+    }
+    const res = this.data.convertResult;
+    const localPath = this.data.resultTempFilePath;
+    const targetFileID = res.fileID;
+    const path = localPath || targetFileID;
+    if (!path) {
+      wx.showToast({ title: '音频文件准备中，请稍候', icon: 'none' });
+      return;
+    }
+
+    let appInstance = null;
+    try { appInstance = getApp(); } catch (e) {}
+    if (appInstance) {
+      if (!appInstance.globalData) appInstance.globalData = {};
+      const baseName = (this.data.sourceFile && this.data.sourceFile.name) ? this.data.sourceFile.name.replace(/\.[^.]+$/, '') : '转换音频';
+      const targetExt = (res.targetFormat || 'mp3').toLowerCase();
+      appInstance.globalData.pendingAudio = {
+        path: localPath || targetFileID,
+        fileID: targetFileID,
+        name: `${baseName}.${targetExt}`,
+        size: res.targetSize || 0,
+        extName: targetExt.toUpperCase(),
+        extLower: targetExt,
+        from: 'audio-convert',
+      };
+    }
+
+    wx.navigateTo({
+      url: '/pages/editor/editor',
+      fail: () => {
+        wx.redirectTo({ url: '/pages/editor/editor' });
+      },
+    });
   },
 
   openSettings() {
