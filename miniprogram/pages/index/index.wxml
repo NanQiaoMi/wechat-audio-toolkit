@@ -440,23 +440,33 @@
         </view>
       </view>
 
-      <!-- 操作导出按钮组 -->
+      <!-- 操作导出按钮组：送入多轨剪辑 + 发好友 / 保存文件 -->
       <view class="result-action-buttons">
-        <button class="export-btn primary-share" bindtap="shareToFriend">
-          <text class="btn-icon-emoji">🚀</text>
-          <text>发给微信好友</text>
+        <button class="export-btn primary-editor" bindtap="sendConvertedToEditor">
+          <text class="btn-icon-emoji">✂️</text>
+          <text>送入多轨剪辑</text>
         </button>
-        <button class="export-btn secondary-save" bindtap="saveToLocal">
-          <text class="btn-icon-emoji">💾</text>
-          <text>保存 / 转发文件</text>
-        </button>
+        <view class="sub-export-row">
+          <button class="export-btn primary-share" bindtap="shareToFriend">
+            <text class="btn-icon-emoji">🚀</text>
+            <text>发给微信好友</text>
+          </button>
+          <button class="export-btn secondary-save" bindtap="saveToLocal">
+            <text class="btn-icon-emoji">💾</text>
+            <text>保存至手机</text>
+          </button>
+        </view>
       </view>
 
       <!-- 辅助链接 -->
       <view class="aux-links-row">
+        <view class="aux-link-item library-link" bindtap="goLibrary">
+          <text class="aux-link-icon">📚</text>
+          <text>我的作品 (已入库)</text>
+        </view>
         <view class="aux-link-item" bindtap="copyDownloadLink">
           <text class="aux-link-icon">🔗</text>
-          <text>复制外链 (电脑浏览器下载)</text>
+          <text>复制外链</text>
         </view>
         <view class="aux-link-item reset-btn" bindtap="resetAll">
           <text class="aux-link-icon">🔄</text>

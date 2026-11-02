@@ -1012,6 +1012,12 @@
 
 /* 导出按钮网格 */
 .result-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.sub-export-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16rpx;
@@ -1033,6 +1039,12 @@
   transform: scale(0.97);
 }
 
+.primary-editor {
+  background-color: #FF6B00;
+  color: #FFFFFF;
+  box-shadow: 0 6rpx 20rpx rgba(255, 107, 0, 0.28);
+}
+
 .primary-share {
   background-color: #16A34A;
   color: #FFFFFF;
@@ -1052,7 +1064,9 @@
 .aux-links-row {
   display: flex;
   justify-content: space-between;
-  padding: 4rpx 6rpx;
+  align-items: center;
+  padding: 8rpx 6rpx 0;
+  border-top: 1px dashed #E7E5E4;
 }
 
 .aux-link-item {
@@ -1062,6 +1076,10 @@
   display: flex;
   align-items: center;
   gap: 6rpx;
+}
+
+.aux-link-item.library-link {
+  color: #B45309;
 }
 
 .aux-link-item.reset-btn {
