@@ -69,90 +69,113 @@
     </view>
   </view>
 
-  <!-- 4. 提取成功结果卡片 (Success Card) -->
-  <view wx:elif="{{status === 'success'}}" class="card-panel result-card">
+  <!-- 4. 提取成功结果卡片 (Fresh Master Victory Card，与首页统一规范) -->
+  <view wx:elif="{{status === 'success'}}" class="card-panel result-success-card">
     
-    <!-- 头部成功指示器 -->
-    <view class="result-status-header">
-      <view class="result-check-badge">✓</view>
+    <!-- 头部成功指示行 -->
+    <view class="result-top-badge">
       <view class="result-title-group">
-        <text class="result-headline">音频提取成功</text>
-        <text class="result-speed-tag">{{speedDescText || ('耗时 ' + (extractCostText || (extractCostMs + 'ms')) + ' · ' + (extractMode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'))}}</text>
+        <text class="success-icon">✓</text>
+        <text class="success-title">提取成功！</text>
       </view>
-      <view class="repick-btn" bindtap="resetToPicker" hover-class="btn-hover">
-        <text class="repick-icon">🔄</text>
-        <text>重选</text>
+      <view class="header-right-action">
+        <text class="cost-tag">{{speedDescText}}</text>
+        <view class="repick-btn-pill" bindtap="resetToPicker" hover-class="pill-hover">
+          <text>重选 ↻</text>
+        </view>
       </view>
     </view>
 
-    <!-- 视频与提取音频元数据展示 -->
-    <view class="extracted-meta-card">
-      <image wx:if="{{videoInfo.thumbTempFilePath}}" class="video-thumb" src="{{videoInfo.thumbTempFilePath}}" mode="aspectFill"></image>
-      <view wx:else class="video-thumb-placeholder">🎬</view>
-      
-      <view class="extracted-text-group">
+    <!-- 视频与提取纯音频体积瘦身对比看板 (Before & After Contrast Board，与格式转换页绝对统一) -->
+    <view class="size-comparison-board">
+      <view class="comp-item">
+        <text class="comp-label">原视频大小</text>
+        <text class="comp-number">{{videoInfo.sizeText || '原片'}}</text>
+        <text class="comp-format-tag">VIDEO</text>
+      </view>
+
+      <view class="comp-center-divider">
+        <text class="comp-arrow-symbol">➔</text>
+        <text wx:if="{{savedRatio > 0}}" class="comp-saved-badge">瘦身 {{savedRatio}}%</text>
+        <text wx:else class="comp-saved-badge">纯音频</text>
+      </view>
+
+      <view class="comp-item highlight">
+        <text class="comp-label">提取纯音频</text>
+        <text class="comp-number">{{resultAudio.sizeText}}</text>
+        <text class="comp-format-tag accent">{{resultAudio.formatUpper}}</text>
+      </view>
+    </view>
+
+    <!-- 提取音频元数据标题行 -->
+    <view class="extracted-title-bar">
+      <view class="meta-icon-box">🎶</view>
+      <view class="meta-content">
         <text class="extracted-audio-name">{{resultAudio.title}}</text>
-        <view class="extracted-tags-row">
-          <text class="tag-capsule format">{{resultAudio.formatUpper}}</text>
-          <text class="tag-capsule dur">{{resultAudio.durationText}}</text>
-          <text class="tag-capsule size">{{resultAudio.sizeText}}</text>
-          <text wx:if="{{extractMode === 'local'}}" class="tag-capsule cloud-convert-pill" bindtap="reExtractViaCloud" hover-class="tag-hover">☁️ 转为标准MP3</text>
+        <view class="meta-badges-row">
+          <text class="pill-badge codec-badge">{{resultAudio.formatUpper}}</text>
+          <text class="pill-badge time-badge">{{resultAudio.durationText}}</text>
+          <text class="pill-badge size-badge">{{resultAudio.sizeText}}</text>
+          <text wx:if="{{extractMode === 'local'}}" class="pill-badge cloud-convert-badge" bindtap="reExtractViaCloud">☁️ 转为标准MP3</text>
         </view>
       </view>
     </view>
 
-    <!-- 即时原声高保真试听器 (Audition Player) -->
-    <view class="audition-player-panel">
-      <view class="player-controls-row">
-        <!-- 播放/暂停按键 -->
-        <view class="player-toggle-btn {{isPlaying ? 'playing' : ''}}" bindtap="togglePlayAudio" hover-class="player-btn-hover">
-          <text class="player-btn-glyph">{{isPlaying ? '⏸' : '▶'}}</text>
-        </view>
-
-        <!-- 寻位滑条与起止时间 -->
-        <view class="player-seek-wrapper">
-          <view class="player-time-row">
-            <view class="player-time-left">
-              <text class="player-time-current">{{playCurrentTimeText}}</text>
-              <text wx:if="{{isPlaying}}" class="player-status-tag">● 正在试听</text>
-            </view>
-            <text class="player-time-total">{{resultAudio.durationText}}</text>
+    <!-- 即时原声高保真试听器 (与首页原声试听完全统一规范) -->
+    <view class="result-audition-box">
+      <view class="audition-header-row">
+        <view class="audition-title-wrap">
+          <text class="audition-title">🎧 提取完成 · 纯音频原声试听</text>
+          <view wx:if="{{isPlaying}}" class="audition-playing-badge">
+            <text class="wave-dot-anim"></text>
+            <text class="playing-txt">正在试听中</text>
           </view>
+        </view>
+        <text class="prep-indicator ready">本地就绪 · 零缓冲</text>
+      </view>
+
+      <!-- 内联试听播放条 -->
+      <view class="inline-player result-inline-player">
+        <view class="player-play-btn result-play-btn {{isPlaying ? 'playing' : ''}}" bindtap="togglePlayAudio" hover-class="play-btn-hover">
+          <text class="play-btn-icon">{{isPlaying ? '⏸' : '▶'}}</text>
+        </view>
+        
+        <view class="player-progress-area">
           <slider
-            class="player-slider"
+            class="custom-slider"
             min="0"
             max="{{sliderMax}}"
             value="{{sliderValue}}"
             backgroundColor="#E7E5E4"
             activeColor="#FF6B00"
-            block-size="14"
+            block-size="16"
             block-color="#FF6B00"
             bindchanging="onSliderChanging"
             bindchange="onSliderChange"
           />
+          <view class="player-time-display">
+            <text class="time-item current">{{playCurrentTimeText}}</text>
+            <text class="time-item total">{{resultAudio.durationText}}</text>
+          </view>
         </view>
       </view>
     </view>
 
-    <!-- 核心操作按钮组 -->
+    <!-- 操作导出按钮组：送入多轨剪辑 + 发好友 / 保存文件 (彻底根除 184px 溢出与折行) -->
     <view class="result-action-buttons">
-      <!-- 英雄主行动：送入多轨剪辑 -->
-      <button class="export-btn primary-editor" bindtap="sendToEditor" hover-class="btn-hover-scale">
+      <!-- 英雄级主按钮：送入多轨剪辑 (全宽 96rpx 药丸按钮) -->
+      <button class="export-btn primary-editor" bindtap="sendToEditor" hover-class="btn-hover-active">
         <text class="btn-icon-emoji">✂️</text>
-        <view class="btn-text-col">
-          <text class="btn-main-title">送入多轨剪辑</text>
-          <text class="btn-sub-title">自由裁剪 · 多轨混音 · 智能变速</text>
-        </view>
-        <text class="btn-arrow-icon">➔</text>
+        <text>送入多轨剪辑</text>
       </button>
 
-      <!-- 双列操作区：发好友 / 保存至手机 -->
+      <!-- 双列操作区：发给好友 / 保存至手机 (50/50 严格对齐) -->
       <view class="sub-export-row">
-        <button class="export-btn primary-share" bindtap="shareOrSaveAudio" hover-class="btn-hover-scale">
+        <button class="export-btn primary-share" bindtap="shareOrSaveAudio" hover-class="btn-hover-active">
           <text class="btn-icon-emoji">🚀</text>
           <text>发给微信好友</text>
         </button>
-        <button class="export-btn secondary-save" bindtap="saveToLocalDisk" hover-class="btn-hover-scale">
+        <button class="export-btn secondary-save" bindtap="saveToLocalDisk" hover-class="btn-hover-active">
           <text class="btn-icon-emoji">💾</text>
           <text>保存至手机</text>
         </button>
@@ -171,7 +194,7 @@
       <text class="utility-arrow">➔</text>
     </view>
 
-    <!-- 底部辅助行：我的作品 + 重新提取 -->
+    <!-- 底部辅助行：我的作品 + 重新提取 (与首页统一) -->
     <view class="aux-links-row">
       <view class="aux-link-item library-link" bindtap="goLibrary">
         <text class="aux-link-icon">📚</text>
@@ -179,9 +202,10 @@
       </view>
       <view class="aux-link-item reset-btn" bindtap="resetToPicker">
         <text class="aux-link-icon">🔄</text>
-        <text>换个视频</text>
+        <text>重新提取</text>
       </view>
     </view>
+
   </view>
 
   <!-- 5. 错误提示卡片 (Error Card) -->
