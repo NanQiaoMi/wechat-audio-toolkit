@@ -492,6 +492,75 @@ const muteGraph = core.buildFilterGraphV2(muteTrackPlan)
 check('多轨静音：T2 被静音后排除出混音', muteGraph.indexOf('trk_T2') < 0 && muteGraph.indexOf('[trk_T1]anull[cat]') >= 0)
 
 // ===========================================================================
+console.log('\n# haptics: 全局触感反馈引擎与防抖节流')
+const haptics = require('../../miniprogram/utils/haptics.js')
+
+let vibrateCalls = []
+global.wx = {
+  vibrateShort: function (opts) {
+    vibrateCalls.push({ type: opts.type, time: Date.now() })
+  }
+}
+
+// 单次震动
+vibrateCalls = []
+haptics.impactLight()
+check('haptics: impactLight 触发 light 震动', vibrateCalls.length === 1 && vibrateCalls[0].type === 'light')
+
+// 防抖节流测试：60ms 内连续调用必须被静默抑制，防马达过载
+haptics.impactHeavy()
+check('haptics: 60ms 节流拦截高频连续震动', vibrateCalls.length === 1)
+
+// medium
+const originalDateNow = Date.now
+Date.now = function () { return originalDateNow() + 100 }
+haptics.impactMedium()
+check('haptics: 超出节流周期后正常触发 medium', vibrateCalls.length === 2 && vibrateCalls[1].type === 'medium')
+
+// heavy
+Date.now = function () { return originalDateNow() + 200 }
+haptics.impactHeavy()
+check('haptics: 正常触发 heavy', vibrateCalls.length === 3 && vibrateCalls[2].type === 'heavy')
+
+// 异常防护：wx.vibrateShort 抛错时静默降级不崩溃
+global.wx.vibrateShort = function () { throw new Error('Hardware motor busy') }
+Date.now = function () { return originalDateNow() + 300 }
+let threw = false
+try {
+  haptics.impactLight()
+} catch (e) {
+  threw = true
+}
+check('haptics: 硬件马达抛错时静默降级', !threw)
+Date.now = originalDateNow
+delete global.wx
+
+// ===========================================================================
+console.log('\n# editorUtils: 时间轴自适应标尺密度与全景毕业')
+const editorUtils = require('../../miniprogram/utils/editor-utils.js')
+
+// 1. 10 分钟超长全景全景测试 (pxPerSec = 1.5, maxTimelineSec = 600)
+const longTrackList = [{ id: 'T1', name: 'A1' }]
+const longClips = [{ id: 'c1', trackId: 'T1', sourceId: 's1', in: 0, out: 600, offsetSec: 0 }]
+const longTimeline = editorUtils.buildTimelineData(longTrackList, longClips, 0, 0.0416, 600)
+check('标尺密度：10 分钟全览刻度未被 45 个死截断 (实际=' + longTimeline.rulerTicks.length + ')', longTimeline.rulerTicks.length >= 10)
+const lastTick = longTimeline.rulerTicks[longTimeline.rulerTicks.length - 1]
+check('标尺密度：末端刻度已完整覆盖至 10 分钟总长 (末端=' + lastTick.sec + 's)', lastTick.sec >= 600)
+
+// 2. 标尺刻度文字间距测试：任意缩放档位下刻度间距必须 ≥ 60rpx 杜绝重叠
+const scales = [0.03, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 3.0]
+let allSeparationValid = true
+scales.forEach(sc => {
+  const tl = editorUtils.buildTimelineData(longTrackList, longClips, 0, sc, 300)
+  const ticks = tl.rulerTicks
+  if (ticks.length >= 2) {
+    const diffRpx = ticks[1].leftRpx - ticks[0].leftRpx
+    if (diffRpx < 60) allSeparationValid = false
+  }
+})
+check('标尺密度：各缩放倍率下相邻刻度间距均 ≥ 60rpx 杜绝拥挤重叠', allSeparationValid)
+
+// ===========================================================================
 console.log('\n============================================')
 console.log('纯函数单测: pass=' + pass + ' fail=' + fail)
 if (fail > 0) {

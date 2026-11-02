@@ -6,6 +6,7 @@
 const editorUtils = require('../../utils/editor-utils.js');
 const monoIcons = require('../../utils/mono-icons.js');
 const libraryStore = require('../../utils/library-store.js');
+const haptics = require('../../utils/haptics.js');
 
 // 状态机：empty → uploading / analyzing → editing → exporting → result
 const STATUS = {
@@ -550,9 +551,7 @@ Page({
       this.initWaveCanvas();
       this.updateUnloadAlert();
     });
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'medium' }); } catch (e) {}
-    }
+    haptics.notificationSuccess();
     wx.showToast({ title: '已恢复剪辑工程', icon: 'success' });
   },
 
@@ -1422,6 +1421,7 @@ Page({
       selectedClipIndex: Math.min(index, res.clips.length - 1),
       toast: '已删除片段',
     });
+    haptics.impactMedium();
   },
 
   splitSelectedClipAtPlayhead() {
@@ -1442,6 +1442,7 @@ Page({
       selectedClipIndex: this.selectedClipIndex + 1,
       toast: '已在播放头处分割',
     });
+    haptics.impactHeavy();
   },
 
   copySelectedClip() {
@@ -1456,7 +1457,7 @@ Page({
       hasClipboard: true,
       clipboardName: clipName,
     });
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    haptics.impactLight();
     wx.showToast({ title: '已复制片段，移动红针后点「粘贴」', icon: 'none' });
   },
 
@@ -1504,7 +1505,7 @@ Page({
       selectedClipIndex: insertIndex,
       toast: '已成功粘贴到时间线',
     });
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'medium' });
+    haptics.impactMedium();
   },
 
   duplicateSelectedClip() {
@@ -1514,7 +1515,7 @@ Page({
 
   toggleExportCompressionPanel() {
     this.setData({ showCompressionPanel: !this.data.showCompressionPanel });
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    haptics.impactLight();
   },
 
   closeCompressionPanel() {
@@ -1529,13 +1530,14 @@ Page({
       exportBitrateIndex: idx,
     });
     this.updateEstimatedFileSize();
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    haptics.impactLight();
   },
 
   onBitrateSliderChanging(e) {
     const idx = Math.max(0, Math.min(BITRATE_OPTIONS.length - 1, Math.round(Number(e.detail.value)) || 0));
     const opt = BITRATE_OPTIONS[idx];
     if (opt.value !== this.data.exportBitrate) {
+      haptics.impactLight();
       this.setData({
         exportBitrate: opt.value,
         exportBitrateIndex: idx,
@@ -1553,7 +1555,7 @@ Page({
       exportBitrateIndex: idx,
     });
     this.updateEstimatedFileSize();
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+    haptics.impactLight();
   },
 
   updateEstimatedFileSize() {
@@ -1666,7 +1668,7 @@ Page({
       return;
     }
     this.setData({ activeTool: 'razor' });
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'medium' });
+    haptics.impactMedium();
     wx.showToast({ title: '✂️ 剃刀就绪：在波形或音轨轻触即剪', icon: 'none' });
   },
 
@@ -1676,12 +1678,12 @@ Page({
     // 智能阻尼与边缘吸附防微残片护栏（Phase 2: Micro-Clip Defense）
     if (cutTime <= clip.in + 0.3) {
       wx.showToast({ title: '✂️ 距起点不足 0.3s，已自动吸附至端点', icon: 'none' });
-      if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+      haptics.impactLight();
       return;
     }
     if (cutTime >= clip.out - 0.3) {
       wx.showToast({ title: '✂️ 距终点不足 0.3s，已自动吸附至端点', icon: 'none' });
-      if (wx.vibrateShort) wx.vibrateShort({ type: 'light' });
+      haptics.impactLight();
       return;
     }
 
@@ -1698,7 +1700,7 @@ Page({
       selectedClipIndex: this.selectedClipIndex + 1,
       toast: `✂️ 已在 ${editorUtils.formatPrecise(cutTime)} 剪开`,
     });
-    if (wx.vibrateShort) wx.vibrateShort({ type: 'heavy' });
+    haptics.impactHeavy();
     this.setData({ justSplitIndex: this.selectedClipIndex + 1 });
     setTimeout(() => {
       this.setData({ justSplitIndex: null });
@@ -2173,9 +2175,7 @@ Page({
           this.selectedClipIndex = this._dragClipIndex;
           this.syncWaveSource();
         }
-        if (wx.vibrateShort) {
-          try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-        }
+        haptics.impactLight();
       }
     }
     if (!this._isDraggingClip) return;
@@ -2250,9 +2250,7 @@ Page({
     }
 
     if (isSnapped && !this._lastSnappedState) {
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactMedium();
     }
     this._lastSnappedState = isSnapped;
     this._finalOffsetSec = nextOffset;
@@ -2317,8 +2315,8 @@ Page({
         dragClipIndex: null,
         dragTipText: '',
       });
-      if (hasMoved && wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (e) {}
+      if (hasMoved) {
+        haptics.impactLight();
       }
     }
     this._dragClipIndex = null;
@@ -2435,9 +2433,7 @@ Page({
     }
 
     if (isSnapped && !this._lastSnappedState) {
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactMedium();
     }
     this._lastSnappedState = isSnapped;
     this._finalTrimIn = nextIn;
@@ -2504,9 +2500,7 @@ Page({
         trimType: '',
         trimTipText: '',
       });
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactLight();
     }
     this._trimClipIndex = null;
     this._lastSnappedState = false;
@@ -2612,9 +2606,7 @@ Page({
     }
 
     if (isSnapped && !this._lastSnappedState) {
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactMedium();
     }
     this._lastSnappedState = isSnapped;
     this._finalTrimOut = nextOut;
@@ -2672,9 +2664,7 @@ Page({
         trimType: '',
         trimTipText: '',
       });
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactLight();
     }
     this._trimClipIndex = null;
     this._lastSnappedState = false;
@@ -2704,18 +2694,14 @@ Page({
       this.pushUndo();
       this.clips[this.selectedClipIndex].offsetSec = prevClip.timelineEndSec;
       this.refreshClipData();
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'medium' }); } catch (e) {}
-      }
+      haptics.impactMedium();
       wx.showToast({ title: '已顺延对齐，消除重叠 ✅', icon: 'success' });
     } else if (trackClips.length > 1) {
       const nextClip = trackClips[1];
       this.pushUndo();
       this.clips[nextClip.index].offsetSec = trackClips[0].timelineEndSec;
       this.refreshClipData();
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'medium' }); } catch (e) {}
-      }
+      haptics.impactMedium();
       wx.showToast({ title: '已顺延后续片段，消除重叠 ✅', icon: 'success' });
     }
   },
@@ -2739,9 +2725,7 @@ Page({
       this.clips = shiftRes.clips;
       this.refreshClipData();
       const trk = this.tracks.find(t => t.id === (shiftRes.movedInfo && shiftRes.movedInfo.targetTrackId));
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'medium' }); } catch (e) {}
-      }
+      haptics.impactMedium();
       wx.showToast({ title: `🎵 已将后一段下移至「${trk ? trk.name : '下一音轨'}」✅`, icon: 'success' });
       return;
     }
@@ -2783,9 +2767,7 @@ Page({
       this.clips[this.selectedClipIndex].isDuplicate = true;
       this.refreshClipData();
       const trk = this.tracks.find(t => t.id === candidateTrackId);
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'medium' }); } catch (e) {}
-      }
+      haptics.impactMedium();
       wx.showToast({ title: `🎵 已移至「${trk ? trk.name : candidateTrackId}」独立混音 ✅`, icon: 'success' });
       return;
     }
@@ -2814,9 +2796,7 @@ Page({
     this.clips[this.selectedClipIndex].trackId = newTrack.id;
     this.clips[this.selectedClipIndex].isDuplicate = true;
     this.refreshClipData();
-    if (wx.vibrateShort) {
-      try { wx.vibrateShort({ type: 'medium' }); } catch (e) {}
-    }
+    haptics.impactMedium();
     wx.showToast({ title: `🎵 已新建「${newTrack.name}」并移入独立混音 ✅`, icon: 'success' });
   },
 
@@ -2860,9 +2840,7 @@ Page({
       // 2. 将播放光标与底层音频指针精准定位至用户点击的声波位置（绝不再生硬倒退至片段开头！）；
       // 3. 伴随轻柔物理微震动反馈。
       this.selectClip(index, targetSourceTime);
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactLight();
     }
   },
 
@@ -3126,15 +3104,14 @@ Page({
       if (this.data.isPlaying) {
         this.seekPlaybackTo(clamped);
       }
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactLight();
     }
   },
 
   onRulerTickTap(e) {
     const time = Number(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.time);
     if (!isFinite(time) || time < 0) return;
+    haptics.impactLight();
     const pxPerSec = (this.data.timelineData && this.data.timelineData.pxPerSec) || 36;
     const maxSec = (this.data.timelineData && this.data.timelineData.maxTimelineSec) || 600;
     const clamped = Math.max(0, Math.min(maxSec, time));
@@ -4381,9 +4358,7 @@ Page({
       this.razorTouchTime = targetTime;
       this.gesture = { mode: 'razor', startX: x, startTime: targetTime, moved: false, multi: false };
       this.drawWave();
-      if (wx.vibrateShort) {
-        try { wx.vibrateShort({ type: 'light' }); } catch (err) {}
-      }
+      haptics.impactLight();
       return;
     }
 
@@ -4663,6 +4638,7 @@ Page({
     this.clearDraft();
     this.updateUnloadAlert();
     wx.showToast({ title: '导出成功', icon: 'success' });
+    haptics.notificationSuccess();
   },
 
   buildOutputName() {

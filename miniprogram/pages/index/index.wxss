@@ -424,6 +424,7 @@
 
 .player-progress-area {
   flex: 1;
+  position: relative;
 }
 
 .custom-slider {

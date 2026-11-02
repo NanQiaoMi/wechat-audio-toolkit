@@ -108,11 +108,15 @@
           </view>
           
           <view class="player-progress-area">
+            <view wx:if="{{isSourceScrubbing}}" class="scrubbing-time-bubble" style="left: {{sourceScrubbingPercent}}%;">
+              {{sourceScrubbingTimeText}}
+            </view>
             <slider 
               class="custom-slider" 
               min="0" 
               max="{{sourceDuration || 100}}" 
               value="{{sourceCurrentTime}}" 
+              bindchanging="onSourceSeeking"
               bindchange="onSourceSeek"
               block-size="14"
               activeColor="#FF6B00"
@@ -412,11 +416,15 @@
             </view>
             
             <view class="player-progress-area">
+              <view wx:if="{{isTargetScrubbing}}" class="scrubbing-time-bubble" style="left: {{targetScrubbingPercent}}%;">
+                {{targetScrubbingTimeText}}
+              </view>
               <slider 
                 class="custom-slider" 
                 min="0" 
                 max="{{targetDuration || 100}}" 
                 value="{{targetCurrentTime}}" 
+                bindchanging="onTargetSeeking"
                 bindchange="onTargetSeek"
                 block-size="16"
                 activeColor="#16A34A"
