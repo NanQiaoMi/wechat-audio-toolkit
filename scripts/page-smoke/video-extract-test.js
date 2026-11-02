@@ -233,6 +233,8 @@ async function runAll() {
     assert.strictEqual(res.success, false);
     assert.strictEqual(res.fallbackToCloud, true);
     assert.ok(res.reason.indexOf('无法直接解码') >= 0);
+    assert.ok(res.localAudioFilePath, '必须返回已解出的本地纯音频路径供快速上传');
+    assert.strictEqual(res.localAudioSize, 500 * 1024, '必须正确获取本地音轨大小');
   });
 
   await itAsync('extractAudioViaCloud: 云函数调用成功提取 MP3', async () => {
@@ -517,6 +519,96 @@ async function runAll() {
     assert.strictEqual(cloudCalled, true);
     assert.strictEqual(page.data.extractMode, 'cloud');
     assert.strictEqual(page.data.resultAudio.format, 'mp3');
+  });
+
+  await itAsync('video-extract page: 本地成功剥离但探针判定无法硬解时，仅上传 3MB 纯音频（而非 200MB 视频），节省 98% 流量', async () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let uploadedFilePath = '';
+    let uploadedCloudPath = '';
+    let cloudCallData = null;
+
+    global.wx = {
+      createInnerAudioContext: () => ({
+        obeyMuteSwitch: true,
+        set src(v) {},
+        play: () => {},
+        stop: () => {},
+        pause: () => {},
+        seek: () => {},
+        destroy: () => {},
+        onPlay: () => {},
+        onPause: () => {},
+        onStop: () => {},
+        onEnded: () => {},
+        onTimeUpdate: () => {},
+        onError: (fn) => setTimeout(() => fn({ errCode: 10001, errMsg: 'MEDIA_ERR_DECODE' }), 5),
+        onCanplay: () => {},
+      }),
+      createMediaContainer: () => ({
+        extractDataSource: ({ success }) => {
+          success({ tracks: [{ kind: 'audio', duration: 180 }] });
+        },
+        addTrack: () => {},
+        export: ({ success }) => {
+          success({ tempFilePath: 'wxfile://tmp/demuxed_audio.m4a' });
+        },
+        destroy: () => {},
+      }),
+      getFileSystemManager: () => ({
+        statSync: () => ({ size: 3.5 * 1024 * 1024 }), // 3.5MB 音频
+      }),
+      showToast: () => {},
+      showModal: () => {},
+      cloud: {
+        uploadFile: async ({ cloudPath, filePath }) => {
+          uploadedCloudPath = cloudPath;
+          uploadedFilePath = filePath;
+          return { fileID: 'cloud://bucket/audio_tmp/extracted.m4a' };
+        },
+        callFunction: ({ data, success }) => {
+          cloudCallData = data;
+          if (success) {
+            success({
+              result: {
+                success: true,
+                fileID: 'cloud://bucket/audio_out.mp3',
+                duration: 180,
+                format: 'mp3',
+                size: 2.8 * 1024 * 1024,
+              },
+            });
+          }
+        },
+        downloadFile: async () => ({ tempFilePath: 'wxfile://tmp/final_audio.mp3' }),
+      },
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.onLoad();
+
+    // 传入 200MB 的大视频
+    await page.handleSelectedVideo({
+      tempFilePath: 'wxfile://tmp/huge_movie_200mb.mp4',
+      name: '巨型4K视频.mp4',
+      size: 200 * 1024 * 1024, // 200MB
+      duration: 180,
+    });
+
+    // 核心断言：上传的文件必须是本地解出的 3.5MB 音频，绝不能是 200MB 的原视频！
+    assert.strictEqual(uploadedFilePath, 'wxfile://tmp/demuxed_audio.m4a', '必须仅上传解出的纯音频，杜绝上传原视频');
+    assert.ok(uploadedCloudPath.startsWith('audio_tmp/'), '必须上传至 audio_tmp 纯音频目录');
+    assert.strictEqual(page.data.status, 'success');
+    assert.strictEqual(page.data.extractMode, 'cloud');
+    assert.ok(page.data.speedDescText.indexOf('省流量') >= 0, '结果摘要必须包含省流量说明');
+    assert.ok(page.data.speedDescText.indexOf('98%') >= 0, '200MB 降至 3.5MB 节省约 98% 流量');
   });
 
   await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 且 compressed: false 规避微信原生压缩与音频解码失败', async () => {

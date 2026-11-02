@@ -105,15 +105,15 @@ Page({
     ctx.onError((err) => {
       console.warn('[video-extract] 音频播放器报错:', err);
       this.setData({ isPlaying: false });
-      if (this.data.extractMode === 'local' && this.rawVideoFile) {
+      if (this.data.extractMode === 'local') {
         wx.showModal({
           title: '音频格式受限',
-          content: '检测到当前手机音频硬件无法解码该本地解封装音轨（常见于视频音轨为特殊格式）。\n\n是否使用云端 FFmpeg 转换为标准 MP3？',
+          content: '当前手机硬件无法解码该本地音轨（常见于视频包含杜比/多声道/特殊编码）。\n\n是否使用云端 FFmpeg 转换为标准 MP3？（仅传输已剥离的轻量音频，超省流量）',
           confirmText: '立即转码',
           cancelText: '取消',
           success: (modalRes) => {
             if (modalRes.confirm) {
-              this.startCloudExtraction(this.rawVideoFile);
+              this.reExtractViaCloud();
             }
           },
         });
@@ -284,30 +284,52 @@ Page({
       return;
     }
 
-    // ---- 策略 2：优雅降级至云端 FFmpeg 强力抽取（自动转为标准 MP3）----
+    // ---- 策略 2：智能优雅降级至云端 FFmpeg 强力转码 ----
+    // 💡 流量极限瘦身：若本地已成功解出纯音频流（仅 2MB~5MB），优先仅上传该纯音频，节省 98% 流量与等待时间！
+    if (localRes.fallbackToCloud && localRes.localAudioFilePath) {
+      await this.startCloudExtraction({
+        tempFilePath: localRes.localAudioFilePath,
+        size: localRes.localAudioSize || 0,
+        duration: localRes.duration || durSec,
+        name: `${rawFile.name.replace(/\.[^.]+$/, '')}_原声.m4a`,
+        isAudioOnlyUpload: true,
+        sourceVideoName: rawFile.name,
+      }, startTime);
+      return;
+    }
+
+    // 若本地底层连容器都无法解析（如冷门格式/损坏文件），才上传原始视频完整兜底
     await this.startCloudExtraction(rawFile, startTime);
   },
 
   /**
    * 启动云端 FFmpeg 强力转码抽取（作为本地解码失败/不兼容的优雅兜底，转为标准 MP3）
+   * 智能支持两种模式：
+   * 1. 纯音频优先模式：仅上传本地解封装出来的 2MB~5MB 音轨，极速秒传，省 98% 流量
+   * 2. 原始视频兜底模式：本地无法解复用时上传原视频
    */
-  async startCloudExtraction(rawFile, startTime = Date.now()) {
-    if (!rawFile) return;
-    const durSec = rawFile.duration ? Math.round(rawFile.duration) : (this.data.videoInfo.duration || 0);
+  async startCloudExtraction(fileToUpload, startTime = Date.now()) {
+    if (!fileToUpload) return;
+    const durSec = fileToUpload.duration ? Math.round(fileToUpload.duration) : (this.data.videoInfo.duration || 0);
+    const isAudioOnly = !!fileToUpload.isAudioOnlyUpload;
+    const displayName = fileToUpload.sourceVideoName || (this.rawVideoFile ? this.rawVideoFile.name : fileToUpload.name) || '视频';
 
-    if (rawFile.size > videoExtractor.MAX_CLOUD_VIDEO_BYTES) {
+    if (fileToUpload.size > videoExtractor.MAX_CLOUD_VIDEO_BYTES) {
       this.setData({
         status: 'error',
-        errorMessage: `该视频编码较特殊，手机本地无法直接解封装；且大小为 ${videoExtractor.formatBytes(rawFile.size)}（超过云端支持限额 ${videoExtractor.formatBytes(videoExtractor.MAX_CLOUD_VIDEO_BYTES)}）。建议先将视频裁剪后再提取。`,
+        errorMessage: `文件大小为 ${videoExtractor.formatBytes(fileToUpload.size)}（超过云端支持限额 ${videoExtractor.formatBytes(videoExtractor.MAX_CLOUD_VIDEO_BYTES)}）。建议先裁剪后再处理。`,
       });
       return;
     }
 
+    const tipSize = videoExtractor.formatBytes(fileToUpload.size);
     this.setData({
       status: 'extracting',
       isCloudProcessing: true,
-      extractTitle: '本地解封装未命中或机型不兼容，正在上传云端抽取…',
-      extractSubTip: '云端 FFmpeg 7.0 强力转码引擎接管，转为标准 MP3',
+      extractTitle: isAudioOnly ? '已在本地剥离纯音频，正在极速上传转码…' : '正在上传视频至云端提取…',
+      extractSubTip: isAudioOnly
+        ? `仅传输 ${tipSize} 纯音频（节省约 98% 流量）· FFmpeg 转为通用 MP3`
+        : '云端 FFmpeg 7.0 强力转码引擎接管，转为标准 MP3',
     });
 
     try {
@@ -315,20 +337,21 @@ Page({
         throw new Error('未开通云开发服务，无法进行云端兜底抽取');
       }
 
-      const cloudExtMatch = String(rawFile.name).match(/\.([a-zA-Z0-9]+)$/);
-      const cloudExt = cloudExtMatch ? cloudExtMatch[1].toLowerCase() : 'mp4';
-      const cloudPath = `video_tmp/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${cloudExt}`;
+      const cloudExtMatch = String(fileToUpload.name).match(/\.([a-zA-Z0-9]+)$/);
+      const cloudExt = cloudExtMatch ? cloudExtMatch[1].toLowerCase() : (isAudioOnly ? 'm4a' : 'mp4');
+      const cloudFolder = isAudioOnly ? 'audio_tmp' : 'video_tmp';
+      const cloudPath = `${cloudFolder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${cloudExt}`;
 
       const uploadRes = await wx.cloud.uploadFile({
         cloudPath,
-        filePath: rawFile.tempFilePath,
+        filePath: fileToUpload.tempFilePath,
       });
 
       if (!uploadRes || !uploadRes.fileID) {
-        throw new Error('上传视频临时文件失败');
+        throw new Error('上传临时文件失败');
       }
 
-      const cloudRes = await videoExtractor.extractAudioViaCloud(uploadRes.fileID, rawFile.name, {
+      const cloudRes = await videoExtractor.extractAudioViaCloud(uploadRes.fileID, displayName, {
         targetFormat: 'mp3',
         bitrate: '192k',
       });
@@ -342,8 +365,15 @@ Page({
       const localAudioPath = dlRes && dlRes.tempFilePath ? dlRes.tempFilePath : '';
 
       const costMs = Date.now() - startTime;
+      const originalVideoSize = (this.data.videoInfo && this.data.videoInfo.size) || (this.rawVideoFile && this.rawVideoFile.size) || 0;
+      let trafficSavedNotice = '';
+      if (isAudioOnly && originalVideoSize > fileToUpload.size) {
+        const savedPercent = Math.max(0, Math.round((1 - fileToUpload.size / originalVideoSize) * 100));
+        trafficSavedNotice = `仅传 ${tipSize} · 省流量 ${savedPercent}%`;
+      }
+
       this.applyExtractionResult({
-        title: `${rawFile.name.replace(/\.[^.]+$/, '')}_原声`,
+        title: `${displayName.replace(/\.[^.]+$/, '')}_原声`,
         format: cloudRes.format || 'mp3',
         duration: cloudRes.duration || durSec || 1,
         size: cloudRes.size || 0,
@@ -351,6 +381,7 @@ Page({
         fileID: cloudRes.fileID,
         mode: 'cloud',
         costMs,
+        trafficSavedNotice,
       });
     } catch (err) {
       let errMsg = String((err && err.message) || err || '音轨提取失败，请重试');
@@ -366,28 +397,47 @@ Page({
 
   /**
    * 手动请求重新使用云端 FFmpeg 转码为标准 MP3
+   * 优先复用本地已剥离的纯音频（2MB~5MB），瞬间完成上传，节省 98% 流量
    */
   reExtractViaCloud() {
-    if (!this.rawVideoFile) {
-      wx.showToast({ title: '原视频已释放，请重新选取', icon: 'none' });
-      return;
-    }
     this.stopAudio();
-    return this.startCloudExtraction(this.rawVideoFile);
+    if (this.data.resultAudio && this.data.resultAudio.tempFilePath && this.data.extractMode === 'local') {
+      const audioPath = this.data.resultAudio.tempFilePath;
+      const audioSize = this.data.resultAudio.size || 0;
+      return this.startCloudExtraction({
+        tempFilePath: audioPath,
+        size: audioSize,
+        duration: this.data.resultAudio.duration,
+        name: `${(this.rawVideoFile ? this.rawVideoFile.name : '视频').replace(/\.[^.]+$/, '')}_原声.m4a`,
+        isAudioOnlyUpload: true,
+        sourceVideoName: this.rawVideoFile ? this.rawVideoFile.name : '',
+      });
+    }
+
+    if (this.rawVideoFile) {
+      return this.startCloudExtraction(this.rawVideoFile);
+    }
+    wx.showToast({ title: '原文件已释放，请重新选取', icon: 'none' });
   },
 
   /**
    * 应用抽取完成后的数据并装配播放器
    */
-  applyExtractionResult({ title, format, duration, size, tempFilePath, fileID, mode, costMs }) {
+  applyExtractionResult({ title, format, duration, size, tempFilePath, fileID, mode, costMs, trafficSavedNotice }) {
     const dur = Math.max(1, Math.round(Number(duration) || 0));
     const sz = Number(size) || 0;
     const fmt = String(format || 'm4a').toLowerCase();
+
+    let speedDesc = `耗时 ${costMs}ms · ${mode === 'local' ? '本地极速剥离 (0流量)' : '云端转码'}`;
+    if (trafficSavedNotice) {
+      speedDesc = `耗时 ${costMs}ms · 云端极速转码 (${trafficSavedNotice})`;
+    }
 
     this.setData({
       status: 'success',
       extractCostMs: costMs,
       extractMode: mode,
+      speedDescText: speedDesc,
       resultAudio: {
         title,
         format: fmt,
