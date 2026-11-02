@@ -177,6 +177,64 @@ async function runAll() {
     assert.ok(res.reason.indexOf('未检测到可用音频轨道') >= 0);
   });
 
+  await itAsync('probeAudioPlayable: 探测成功 (onCanplay 触发时返回 true)', async () => {
+    global.wx = {
+      createInnerAudioContext: () => ({
+        set src(v) {},
+        onCanplay: (fn) => setTimeout(fn, 10),
+        onError: (fn) => {},
+        stop: () => {},
+        destroy: () => {},
+      }),
+    };
+    const ok = await videoExtractor.probeAudioPlayable('wxfile://test.m4a');
+    assert.strictEqual(ok, true);
+  });
+
+  await itAsync('probeAudioPlayable: 探测失败 (onError 触发时拦截返回 false)', async () => {
+    global.wx = {
+      createInnerAudioContext: () => ({
+        set src(v) {},
+        onCanplay: (fn) => {},
+        onError: (fn) => setTimeout(() => fn({ errCode: 10001, errMsg: 'MEDIA_ERR_DECODE' }), 10),
+        stop: () => {},
+        destroy: () => {},
+      }),
+    };
+    const ok = await videoExtractor.probeAudioPlayable('wxfile://unplayable.m4a');
+    assert.strictEqual(ok, false);
+  });
+
+  await itAsync('extractAudioLocally: 探测不可播放时自动标记 fallbackToCloud: true 触发云端接管', async () => {
+    global.wx = {
+      createMediaContainer: () => ({
+        extractDataSource: ({ success }) => {
+          success({ tracks: [{ kind: 'audio', duration: 60 }] });
+        },
+        addTrack: () => {},
+        export: ({ success }) => {
+          success({ tempFilePath: 'wxfile://tmp/bad_codec.m4a' });
+        },
+        destroy: () => {},
+      }),
+      getFileSystemManager: () => ({
+        statSync: () => ({ size: 500 * 1024 }),
+      }),
+      createInnerAudioContext: () => ({
+        set src(v) {},
+        onCanplay: (fn) => {},
+        onError: (fn) => setTimeout(() => fn({ errCode: 10001, errMsg: 'DECODE_ERROR' }), 10),
+        stop: () => {},
+        destroy: () => {},
+      }),
+    };
+
+    const res = await videoExtractor.extractAudioLocally('wxfile://video.mp4');
+    assert.strictEqual(res.success, false);
+    assert.strictEqual(res.fallbackToCloud, true);
+    assert.ok(res.reason.indexOf('无法直接解码') >= 0);
+  });
+
   await itAsync('extractAudioViaCloud: 云函数调用成功提取 MP3', async () => {
     global.wx = {
       cloud: {
@@ -238,6 +296,7 @@ async function runAll() {
         onEnded: (fn) => {},
         onTimeUpdate: (fn) => {},
         onError: (fn) => {},
+        onCanplay: (fn) => setTimeout(fn, 5),
       }),
       createMediaContainer: () => ({
         extractDataSource: ({ success }) => {
@@ -310,6 +369,154 @@ async function runAll() {
     // 重置回拾取器
     page.resetToPicker();
     assert.strictEqual(page.data.status, 'idle');
+    assert.strictEqual(page.rawVideoFile, null);
+  });
+
+  await itAsync('video-extract page: 试听播放器报错时弹出云端转码引导弹窗，点击转码调用云端抽取', async () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let modalConfig = null;
+    let cloudCalled = false;
+    let playerErrCb = null;
+
+    global.wx = {
+      createInnerAudioContext: () => ({
+        obeyMuteSwitch: true,
+        set src(v) {},
+        play: () => {},
+        stop: () => {},
+        pause: () => {},
+        seek: () => {},
+        destroy: () => {},
+        onPlay: () => {},
+        onPause: () => {},
+        onStop: () => {},
+        onEnded: () => {},
+        onTimeUpdate: () => {},
+        onError: (fn) => { playerErrCb = fn; },
+        onCanplay: (fn) => {},
+      }),
+      showModal: (cfg) => {
+        modalConfig = cfg;
+        if (cfg.success) cfg.success({ confirm: true });
+      },
+      showToast: () => {},
+      cloud: {
+        uploadFile: async () => ({ fileID: 'cloud://bucket/sample.mp4' }),
+        callFunction: ({ success }) => {
+          cloudCalled = true;
+          if (success) {
+            success({
+              result: {
+                success: true,
+                fileID: 'cloud://bucket/sample.mp3',
+                duration: 45,
+                format: 'mp3',
+                size: 1024 * 500,
+              },
+            });
+          }
+        },
+        downloadFile: async () => ({ tempFilePath: 'wxfile://tmp/downloaded.mp3' }),
+      },
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.onLoad();
+    page.setData({ extractMode: 'local' });
+    page.rawVideoFile = {
+      tempFilePath: 'wxfile://tmp/original.mp4',
+      name: '特殊音轨视频.mp4',
+      size: 10 * 1024 * 1024,
+      duration: 45,
+    };
+
+    // 触发播放器解码错误
+    assert.ok(playerErrCb, '必须注册 onError 回调');
+    playerErrCb({ errCode: 10001, errMsg: 'MEDIA_ERR_DECODE' });
+
+    assert.ok(modalConfig, '必须弹出受限提示弹窗');
+    assert.strictEqual(modalConfig.title, '音频格式受限');
+    assert.ok(modalConfig.content.indexOf('云端 FFmpeg 转换为标准 MP3') >= 0);
+
+    // 等待云端抽取执行完成
+    await new Promise((r) => setTimeout(r, 50));
+    assert.strictEqual(cloudCalled, true, '点击转码后必须调用云端抽取');
+    assert.strictEqual(page.data.status, 'success');
+    assert.strictEqual(page.data.extractMode, 'cloud');
+    assert.strictEqual(page.data.resultAudio.format, 'mp3');
+  });
+
+  await itAsync('video-extract page: reExtractViaCloud 手动一键转为标准 MP3', async () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let cloudCalled = false;
+
+    global.wx = {
+      createInnerAudioContext: () => ({
+        obeyMuteSwitch: true,
+        set src(v) {},
+        play: () => {},
+        stop: () => {},
+        pause: () => {},
+        seek: () => {},
+        destroy: () => {},
+        onPlay: () => {},
+        onPause: () => {},
+        onStop: () => {},
+        onEnded: () => {},
+        onTimeUpdate: () => {},
+        onError: () => {},
+        onCanplay: () => {},
+      }),
+      showToast: () => {},
+      cloud: {
+        uploadFile: async () => ({ fileID: 'cloud://bucket/re_extract.mp4' }),
+        callFunction: ({ success }) => {
+          cloudCalled = true;
+          if (success) {
+            success({
+              result: {
+                success: true,
+                fileID: 'cloud://bucket/re_extract.mp3',
+                duration: 30,
+                format: 'mp3',
+                size: 600 * 1024,
+              },
+            });
+          }
+        },
+        downloadFile: async () => ({ tempFilePath: 'wxfile://tmp/re_extracted.mp3' }),
+      },
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.onLoad();
+    page.rawVideoFile = {
+      tempFilePath: 'wxfile://tmp/manual.mp4',
+      name: '手动重转.mp4',
+      size: 5 * 1024 * 1024,
+      duration: 30,
+    };
+
+    await page.reExtractViaCloud();
+    assert.strictEqual(cloudCalled, true);
+    assert.strictEqual(page.data.extractMode, 'cloud');
+    assert.strictEqual(page.data.resultAudio.format, 'mp3');
   });
 
   await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 且 compressed: false 规避微信原生压缩与音频解码失败', async () => {

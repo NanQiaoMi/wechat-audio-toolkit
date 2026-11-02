@@ -466,6 +466,18 @@
   color: #78716C;
 }
 
+.tag-capsule.cloud-convert-pill {
+  background-color: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FCD34D;
+  margin-left: 6rpx;
+}
+
+.tag-hover {
+  opacity: 0.75;
+  transform: scale(0.96);
+}
+
 /* 原声高保真试听面板 */
 .audition-player-panel {
   background-color: #FFFFFF;

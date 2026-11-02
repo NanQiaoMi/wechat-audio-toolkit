@@ -105,7 +105,21 @@ Page({
     ctx.onError((err) => {
       console.warn('[video-extract] 音频播放器报错:', err);
       this.setData({ isPlaying: false });
-      wx.showToast({ title: '播放失败，音频格式异常', icon: 'none' });
+      if (this.data.extractMode === 'local' && this.rawVideoFile) {
+        wx.showModal({
+          title: '音频格式受限',
+          content: '检测到当前手机音频硬件无法解码该本地解封装音轨（常见于视频音轨为特殊格式）。\n\n是否使用云端 FFmpeg 转换为标准 MP3？',
+          confirmText: '立即转码',
+          cancelText: '取消',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              this.startCloudExtraction(this.rawVideoFile);
+            }
+          },
+        });
+      } else {
+        wx.showToast({ title: '播放失败，音频格式异常', icon: 'none' });
+      }
     });
 
     this.audioCtx = ctx;
@@ -217,6 +231,7 @@ Page({
    * 处理选中的视频并启动双核提取流
    */
   async handleSelectedVideo(rawFile) {
+    this.rawVideoFile = rawFile;
     const check = videoExtractor.validateVideoFile(rawFile);
     if (!check.valid) {
       wx.showModal({
@@ -269,7 +284,17 @@ Page({
       return;
     }
 
-    // ---- 策略 2：优雅降级至云端 FFmpeg 强力抽取 ----
+    // ---- 策略 2：优雅降级至云端 FFmpeg 强力抽取（自动转为标准 MP3）----
+    await this.startCloudExtraction(rawFile, startTime);
+  },
+
+  /**
+   * 启动云端 FFmpeg 强力转码抽取（作为本地解码失败/不兼容的优雅兜底，转为标准 MP3）
+   */
+  async startCloudExtraction(rawFile, startTime = Date.now()) {
+    if (!rawFile) return;
+    const durSec = rawFile.duration ? Math.round(rawFile.duration) : (this.data.videoInfo.duration || 0);
+
     if (rawFile.size > videoExtractor.MAX_CLOUD_VIDEO_BYTES) {
       this.setData({
         status: 'error',
@@ -279,9 +304,10 @@ Page({
     }
 
     this.setData({
+      status: 'extracting',
       isCloudProcessing: true,
-      extractTitle: '本地解封装未命中，正在上传云端抽取…',
-      extractSubTip: '云端 FFmpeg 7.0 强力转码引擎接管',
+      extractTitle: '本地解封装未命中或机型不兼容，正在上传云端抽取…',
+      extractSubTip: '云端 FFmpeg 7.0 强力转码引擎接管，转为标准 MP3',
     });
 
     try {
@@ -336,6 +362,18 @@ Page({
         errorMessage: errMsg,
       });
     }
+  },
+
+  /**
+   * 手动请求重新使用云端 FFmpeg 转码为标准 MP3
+   */
+  reExtractViaCloud() {
+    if (!this.rawVideoFile) {
+      wx.showToast({ title: '原视频已释放，请重新选取', icon: 'none' });
+      return;
+    }
+    this.stopAudio();
+    return this.startCloudExtraction(this.rawVideoFile);
   },
 
   /**
@@ -590,6 +628,7 @@ Page({
 
   resetToPicker() {
     this.stopAudio();
+    this.rawVideoFile = null;
     this.setData({
       status: 'idle',
       isPlaying: false,

@@ -89,6 +89,76 @@ function validateVideoFile(file) {
 }
 
 /**
+ * 探测本地导出的音频文件是否能被当前设备的 InnerAudioContext 正常解码播放
+ * @param {string} filePath 本地临时音频路径
+ * @param {number} [timeoutMs=800] 探测超时毫秒
+ * @returns {Promise<boolean>} 是否可解码出声
+ */
+function probeAudioPlayable(filePath, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    if (typeof wx === 'undefined' || typeof wx.createInnerAudioContext !== 'function') {
+      resolve(true); // 无微信 API 环境（如纯单测）默认放行
+      return;
+    }
+    if (!filePath) {
+      resolve(false);
+      return;
+    }
+
+    let settled = false;
+    let ctx = null;
+    try {
+      ctx = wx.createInnerAudioContext();
+    } catch (e) {
+      resolve(true);
+      return;
+    }
+
+    const cleanup = () => {
+      if (!settled) {
+        settled = true;
+        if (ctx) {
+          try { ctx.stop(); } catch (e) {}
+          try { ctx.destroy(); } catch (e) {}
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        cleanup();
+        resolve(true); // 800ms 内未报错默认视为可用
+      }
+    }, timeoutMs);
+
+    if (typeof ctx.onCanplay === 'function') {
+      ctx.onCanplay(() => {
+        clearTimeout(timer);
+        cleanup();
+        resolve(true);
+      });
+    }
+
+    if (typeof ctx.onError === 'function') {
+      ctx.onError((err) => {
+        clearTimeout(timer);
+        console.warn('[video-extractor] 试听探测拦截：本地音轨文件无法被当前手机直接解码:', err);
+        cleanup();
+        resolve(false);
+      });
+    }
+
+    try {
+      ctx.src = filePath;
+    } catch (err) {
+      clearTimeout(timer);
+      cleanup();
+      resolve(false);
+    }
+  });
+}
+
+/**
  * 本地解复用提取音轨 (使用微信原生 MediaContainer)
  * 仅剥离音轨容器封装，无需重编码，速度通常在 0.5s ~ 1.5s
  * @param {string} videoFilePath 本地临时视频路径
@@ -206,13 +276,27 @@ function extractAudioLocally(videoFilePath, options = {}) {
               } catch (statErr) {}
 
               const trackDur = audioTracks[0] && audioTracks[0].duration ? audioTracks[0].duration : 0;
-              resolve({
-                success: true,
-                mode: 'local',
-                tempFilePath: safeAudioPath,
-                duration: trackDur,
-                size: actualSize,
-                format: 'm4a',
+
+              // 关键校验：在前端即刻探测当前机型是否支持该本地解复用产物的音频解码播放
+              probeAudioPlayable(safeAudioPath).then((isPlayable) => {
+                if (!isPlayable) {
+                  resolve({
+                    success: false,
+                    mode: 'local',
+                    fallbackToCloud: true,
+                    reason: '本地解封装音轨编码特殊（如杜比/高码率/视频容器封装），当前手机播放器无法直接解码，正在自动切换云端 FFmpeg 强力转码',
+                  });
+                  return;
+                }
+
+                resolve({
+                  success: true,
+                  mode: 'local',
+                  tempFilePath: safeAudioPath,
+                  duration: trackDur,
+                  size: actualSize,
+                  format: 'm4a',
+                });
               });
             },
             fail: (expErr) => {
@@ -365,6 +449,7 @@ module.exports = {
   formatSeconds,
   formatBytes,
   validateVideoFile,
+  probeAudioPlayable,
   extractAudioLocally,
   extractAudioViaCloud,
   buildLibraryItem,
