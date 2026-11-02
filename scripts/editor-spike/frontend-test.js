@@ -2210,10 +2210,28 @@ smokeTest('播放时钟高精物理插值引擎：全片播放时间码连续递
   assert.strictEqual(page.data.currentTimeText, '00:12.5', '全片播放时时间码必须连续显示时间轴成片时间');
   assert.ok(page.data['timelineData.playheadRpx'] > 0);
 
-  // 6. 模拟硬件时间漂移（如音频硬件报告已播放至 7.8s，漂移 300ms）
-  page.sourceAudio.currentTime = 7.8;
-  page.tickPlayback();
-  assert.ok(page.data.isPlaying);
+  // 6. 验证微信硬件台阶式延迟下时间码严格单调递增，绝不因硬件台阶突跳倒退
+  // 模拟微信底层 currentTime 滞留在 7.5s (250ms 台阶窗口)，而物理时钟连续走字
+  const timecodes = [];
+  for (let step = 1; step <= 5; step++) {
+    page.sourceAudio.currentTime = 7.5; // 硬件台阶静止
+    page._playbackWallStart = Date.now() - (2500 + step * 70); // 物理时间走过 70ms, 140ms, 210ms, 280ms, 350ms
+    page.tickPlayback();
+    timecodes.push(page.data.currentTimeText);
+  }
+  // 必须连续单调递增：12.5 -> 12.6 -> 12.7 -> 12.8 -> 12.9
+  assert.strictEqual(timecodes[0], '00:12.6');
+  assert.strictEqual(timecodes[1], '00:12.6'); // 70ms 步进
+  assert.strictEqual(timecodes[4], '00:12.9');
+  for (let i = 1; i < timecodes.length; i++) {
+    assert.ok(timecodes[i] >= timecodes[i - 1], `时间码必须单调不减: ${timecodes[i]} >= ${timecodes[i - 1]}`);
+  }
+
+  // 7. 验证 seek 到第二段（例如时间轴 16.0s 处，对应源 B 的 in(5) + 6 = 11s）
+  page.seekPlaybackTo(16.0);
+  assert.strictEqual(page._playbackStartTimelineSec, 16.0, 'seek 后起始成片时间必须对齐目标点 16.0s');
+  assert.strictEqual(page._playbackStartSourceTime, 11.0, 'seek 后起始源时间必须对齐目标点 11.0s');
+  assert.strictEqual(page.data.currentTimeText, '00:16.0');
 
   page.stopPlayback();
   assert.strictEqual(page.data.isPlaying, false);
@@ -2233,7 +2251,7 @@ async function main() {
     console.log(`结果：${passed} 通过，${failures.length} 失败`);
     failures.forEach((f) => {
       console.log(' - ' + f.name);
-      if (f.err && f.err.stack) console.log('   ' + f.err.stack.split('\n').slice(0, 3).join('\n   '));
+      if (f.err && f.err.stack) console.log('   ' + f.err.stack.split('\n').slice(0, 10).join('\n   '));
     });
     process.exit(1);
   }

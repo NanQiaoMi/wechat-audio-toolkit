@@ -603,10 +603,32 @@ Page({
   initSourceAudio() {
     const ctx = wx.createInnerAudioContext();
     ctx.onCanplay(() => this.handleSourceCanplay());
-    ctx.onTimeUpdate(() => this.tickPlayback());
+    ctx.onPlay(() => this.handleSourcePlay());
+    // 监听硬件时钟更新（只作为底层时间缓存，不直接扰动 35ms 高精物理时钟）
+    ctx.onTimeUpdate(() => {
+      if (this.sourceAudio && isFinite(this.sourceAudio.currentTime)) {
+        this._lastHwCurrentTime = Number(this.sourceAudio.currentTime);
+        this._lastHwTimeAt = Date.now();
+      }
+    });
     ctx.onEnded(() => this.handleSourceEnded());
     ctx.onError((err) => this.handleSourceAudioError(err));
     this.sourceAudio = ctx;
+  },
+
+  handleSourcePlay() {
+    // 原生硬件正式出声：校准墙上时钟起始点，消除启动缓冲延迟
+    if (this.data.isPlaying && this.playback) {
+      const pb = this.playback;
+      const item = pb.queue[pb.index];
+      if (item && !this._playbackWallStart) {
+        this._playbackWallStart = Date.now();
+        this._playbackStartSourceTime = this.currentSourceTime || item.in;
+        const clipOutputStart = editorUtils.queueOutputPosition(pb.queue, pb.index, item.in);
+        this._playbackStartTimelineSec = clipOutputStart + Math.max(0, this._playbackStartSourceTime - item.in);
+        this._playbackSpeed = item.speed || 1.0;
+      }
+    }
   },
 
   initResultAudio() {
@@ -3185,9 +3207,17 @@ Page({
       this._playbackStartSourceTime = foundClipIn;
       this._playbackStartTimelineSec = targetSec;
       this.currentSourceTime = foundClipIn;
+      this._lastDisplayTime = pb.mode === 'all' ? targetSec : foundClipIn;
+
+      const pxPerSec = (this.data.timelineData && this.data.timelineData.pxPerSec) || 36;
+      this.setData({
+        currentTimeText: editorUtils.formatPrecise(this._lastDisplayTime),
+        'timelineData.playheadRpx': Math.round(targetSec * pxPerSec),
+      });
+
       if (pb.index !== foundIndex) {
         this.previewSrcId = '';
-        this.playQueueAt(foundIndex);
+        this.playQueueAt(foundIndex, foundClipIn, targetSec);
         setTimeout(() => {
           try {
             ctx.startTime = foundClipIn;
@@ -3476,16 +3506,9 @@ Page({
       this._playbackStartSourceTime = this.currentSourceTime;
       this._playbackStartTimelineSec = initialTimelineSec;
       this._playbackSpeed = built.queue[startIndex].speed || 1.0;
+      this._lastDisplayTime = mode === 'all' ? initialTimelineSec : this.currentSourceTime;
 
-      this.playQueueAt(startIndex);
-      if (startOffset > 0) {
-        setTimeout(() => {
-          try {
-            this.sourceAudio.startTime = startOffset;
-            this.sourceAudio.seek(startOffset);
-          } catch (e) {}
-        }, 60);
-      }
+      this.playQueueAt(startIndex, this.currentSourceTime, initialTimelineSec);
       this.startPlayTimer();
     }
   },
@@ -3625,7 +3648,7 @@ Page({
     } catch (e) {}
   },
 
-  playQueueAt(index) {
+  playQueueAt(index, initialOffset, initialTimelineSec) {
     const pb = this.playback;
     const ctx = this.sourceAudio;
     if (!pb || !ctx) return;
@@ -3636,21 +3659,26 @@ Page({
     }
     pb.index = index;
     this.syncSelectedClipForPlayback(item.clipIndex);
-    this.currentSourceTime = item.in;
-    this.applyPreviewVolume(item.in);
+
+    const seekIn = (typeof initialOffset === 'number' && isFinite(initialOffset)) ? initialOffset : item.in;
+    this.currentSourceTime = seekIn;
+    this.applyPreviewVolume(seekIn);
     this.drawWave();
 
     // 重新对齐高精物理时钟锚点
     this._playbackWallStart = Date.now();
-    this._playbackStartSourceTime = item.in;
+    this._playbackStartSourceTime = seekIn;
     const clipOutputStart = editorUtils.queueOutputPosition(pb.queue, index, item.in);
-    this._playbackStartTimelineSec = clipOutputStart;
+    const startTimelinePos = (typeof initialTimelineSec === 'number' && isFinite(initialTimelineSec))
+      ? initialTimelineSec
+      : (clipOutputStart + Math.max(0, seekIn - item.in));
+    this._playbackStartTimelineSec = startTimelinePos;
     this._playbackSpeed = item.speed || 1.0;
 
     // 关键：显式设置 InnerAudioContext 的 startTime 和 playbackRate
     // 微信小程序在未设置 startTime 时，seek 可能会被 native 重置回 00:00
     try {
-      ctx.startTime = item.in;
+      ctx.startTime = seekIn;
       if (typeof ctx.playbackRate !== 'undefined') {
         ctx.playbackRate = item.speed || 1.0;
       }
@@ -3664,14 +3692,14 @@ Page({
         ctx.stop();
       } catch (e) {}
       try {
-        ctx.startTime = item.in;
+        ctx.startTime = seekIn;
         ctx.src = item.localPath;
       } catch (e) {}
       return;
     }
     try {
-      ctx.startTime = item.in;
-      ctx.seek(item.in);
+      ctx.startTime = seekIn;
+      ctx.seek(seekIn);
     } catch (e) {}
     try {
       ctx.play();
@@ -3693,24 +3721,29 @@ Page({
   advancePlayback() {
     const pb = this.playback;
     if (!pb || pb.switching) return;
-    pb.switching = true;
     const next = pb.index + 1;
     if (next >= pb.queue.length) {
       this.finishPlayback();
       return;
     }
+    pb.switching = true;
+    const nextItem = pb.queue[next];
+    const nextClipStartOut = editorUtils.queueOutputPosition(pb.queue, next, nextItem.in);
+
+    // 关键：无缝衔接时钟锚点，全片播放时间码与指针平滑穿透，绝无停顿与突跳
+    this._playbackWallStart = Date.now();
+    this._playbackStartSourceTime = nextItem.in;
+    this._playbackStartTimelineSec = nextClipStartOut;
+    this._playbackSpeed = nextItem.speed || 1.0;
+
     const ctx = this.sourceAudio;
     try {
       if (ctx) ctx.pause();
     } catch (e) {}
-    // pause 后稍等一拍再切，减少部分机型爆音
+    this.playQueueAt(next);
     setTimeout(() => {
-      if (this.playback !== pb) return;
-      this.playQueueAt(next);
-      setTimeout(() => {
-        if (this.playback === pb) pb.switching = false;
-      }, 220);
-    }, 30);
+      if (this.playback === pb) pb.switching = false;
+    }, 120);
   },
 
   handleSourceEnded() {
@@ -3720,7 +3753,7 @@ Page({
   tickPlayback() {
     const pb = this.playback;
     const ctx = this.sourceAudio;
-    if (!pb || !ctx || !this.data.isPlaying || pb.switching) return;
+    if (!pb || !ctx || !this.data.isPlaying) return;
     const item = pb.queue[pb.index];
     if (!item) return;
 
@@ -3746,27 +3779,40 @@ Page({
       this._playbackSpeed = item.speed || 1.0;
     }
 
-    // 基于高精度物理时钟连续递增（微秒级插值）
+    // 1. 基于高精度物理时钟连续递增（微秒级插值）
     const elapsed = Math.max(0, (now - this._playbackWallStart) / 1000 * (this._playbackSpeed || 1.0));
     let continuousSourceTime = this._playbackStartSourceTime + elapsed;
     let continuousTimelineSec = this._playbackStartTimelineSec + elapsed;
 
-    // 弱依赖音频硬件时钟校准：
-    // 当微信底层 onTimeUpdate 或 ctx.currentTime 偶尔刷新时，只作为校准锚点
-    if (isFinite(t) && t > 0) {
+    // 2. 硬件时钟软对齐 (Soft PLL Anchor Slew)：
+    // 微信底层 InnerAudioContext.currentTime 具有 250ms~400ms 的原生离散阶梯延迟。
+    // 绝对禁止直接将 continuousSourceTime 赋值为 t（赋值会造成倒退突跳）。
+    // 仅当硬件时间滞后或超前超过 450ms（超出常规阶梯步进窗口，说明发生了真实的缓冲卡顿）时，
+    // 以每帧最大 15ms 的平滑微调率（Slew Rate）温和拉动基准，肉眼完全感知不到抖动。
+    if (isFinite(t) && t >= item.in - 0.05 && t <= item.out + 0.5) {
       const drift = t - continuousSourceTime;
-      // 仅当误差超过 160ms（说明播放硬件发生了缓冲停顿或延迟）时，才温和拉动物理时钟基准
-      if (Math.abs(drift) > 0.16) {
-        this._playbackWallStart += (drift * 0.4) * 1000;
-        continuousSourceTime = t;
-        continuousTimelineSec = pb.mode === 'all'
-          ? editorUtils.queueOutputPosition(pb.queue, pb.index, t)
-          : t;
+      if (Math.abs(drift) > 0.45) {
+        const gentleSlew = Math.max(-0.015, Math.min(0.015, drift * 0.1));
+        this._playbackWallStart -= gentleSlew * 1000;
       }
     }
 
-    // 片段播放结束边界判定
-    if (continuousSourceTime >= item.out - 0.05 || (isFinite(t) && t >= item.out - 0.06)) {
+    // 3. 严格单调性保证（Strict Monotonicity）：
+    // 在播放进行中，时间码决不能倒退！
+    if (typeof this._lastDisplayTime === 'number' && isFinite(this._lastDisplayTime)) {
+      if (pb.mode === 'all') {
+        if (continuousTimelineSec < this._lastDisplayTime) {
+          continuousTimelineSec = this._lastDisplayTime;
+        }
+      } else {
+        if (continuousSourceTime < this._lastDisplayTime) {
+          continuousSourceTime = this._lastDisplayTime;
+        }
+      }
+    }
+
+    // 4. 片段播放结束边界判定
+    if (continuousSourceTime >= item.out - 0.02 || (isFinite(t) && t >= item.out - 0.04 && t > item.in)) {
       this.advancePlayback();
       return;
     }
@@ -3774,7 +3820,7 @@ Page({
     this.currentSourceTime = editorUtils.clampNumber(continuousSourceTime, item.in, item.out);
     this.applyPreviewVolume(this.currentSourceTime);
 
-    // 计算成片时间轴位置与标尺红针坐标
+    // 5. 计算成片时间轴位置与标尺红针坐标
     const outputSec = pb.mode === 'all'
       ? continuousTimelineSec
       : editorUtils.queueOutputPosition(pb.queue, pb.index, this.currentSourceTime);
@@ -3789,6 +3835,8 @@ Page({
 
     // 全片播放时展示成片时间轴时间码；单片段试听时展示片段内源时间码
     const displayTimeSec = pb.mode === 'all' ? outputSec : this.currentSourceTime;
+    this._lastDisplayTime = displayTimeSec;
+
     const patch = {
       currentTimeText: editorUtils.formatPrecise(displayTimeSec),
       'timelineData.playheadRpx': playheadRpx,
@@ -3848,6 +3896,7 @@ Page({
     }
     this.clearPlayTimer();
     this.paused = true;
+    this._lastDisplayTime = null;
     this.setData({ isPlaying: false });
   },
 
@@ -3871,6 +3920,7 @@ Page({
       return;
     }
     this.paused = false;
+    this._lastDisplayTime = null;
     this.setData({ isPlaying: true });
 
     // 恢复高精物理时钟锚点
@@ -3890,6 +3940,7 @@ Page({
   finishPlayback() {
     this.clearPlayTimer();
     this._playbackWallStart = null;
+    this._lastDisplayTime = null;
     this._userIsBrowsingTimeline = false;
     this._userIsTouchingTimeline = false;
     if (this.isMultiTrackPlaying) {
@@ -3922,6 +3973,7 @@ Page({
   stopPlaybackAudioOnly() {
     this.clearPlayTimer();
     this._playbackWallStart = null;
+    this._lastDisplayTime = null;
     this._userIsBrowsingTimeline = false;
     this._userIsTouchingTimeline = false;
     if (this.isMultiTrackPlaying) {
