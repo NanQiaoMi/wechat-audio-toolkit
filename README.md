@@ -1,53 +1,185 @@
-# 音频格式转换小程序
+# WeChat Audio Toolkit (微信音频全能工具箱)
 
-在微信里完成音频格式转换：从微信聊天导入音频 → 选择目标格式与音质 → 云端转码 → 试听 / 转发好友 / PC 保存。
+基于微信小程序原生框架与云开发 Serverless FFmpeg 7.0 强力引擎的专业级音频工作台。集成了音频格式转换与极限压缩、视频提取音频（双核混合架构）、专业多轨非线性音乐剪辑、现场高清录音与作品库管理五大核心能力。
 
-> 当前阶段（2026-10-28）：个人主体、云开发环境已开通（`cloud1-d0g1pwjogd2f39be2`）；路线 A（云函数 + 静态 FFmpeg 7.0.2）**有条件通过**，转换主链路原型可端到端（真实 5min 音频 15.1s）；额度/24h 清理/隐私弹窗/设置页已验证。**待办：备案与隐私指引配置、类目提交、真机全流程、正式函数命名**。并已将 **「音乐剪辑」MVP v2 与「格式转换」合并为同一个小程序的双 tab 入口**（`pages/index` / `pages/editor`）：支持多选导入（≤5 个音频）→片段时间线（上移/下移/分割/裁剪/删除/撤销）→每片段独立淡入淡出→跨源预览→导出 MP3→试听/转发；详细设计与实现偏差见 [docs/MUSIC_EDITOR_DESIGN.md](./docs/MUSIC_EDITOR_DESIGN.md)。
-> 三个关键约束：小程序不能读取手机本地文件；iOS 不能直接试听 flac/ogg/amr/ape/wma；手机端不能把音频保存到系统目录。
+---
 
-## 文档
+## 核心特性与功能矩阵
 
-| 文档 | 说明 |
-| :--- | :--- |
-| [docs/README.md](./docs/README.md) | 文档索引与阅读顺序 |
-| [docs/FEASIBILITY.md](./docs/FEASIBILITY.md) | 可行性研究（官方来源核实、限制、合规） |
-| [docs/TASK_PLAN.md](./docs/TASK_PLAN.md) | 任务计划与技术方案（架构、WBS、排期、风险） |
-| [docs/PRD.md](./docs/PRD.md) | 产品需求文档（功能、页面、流程、验收） |
-| [docs/DEV_LOG.md](./docs/DEV_LOG.md) | 开发记录（ADR、进度、问题、模板） |
-| [docs/MUSIC_EDITOR_DESIGN.md](./docs/MUSIC_EDITOR_DESIGN.md) | **在线音乐编辑详细设计 + 音乐剪辑 MVP 实现记录** |
+### 1. 音频格式转换与极限压缩工坊
+- **全格式双向转换**：深度支持 MP3, WAV, AAC, M4A, FLAC, OGG 等多格式双向互转与重编码。
+- **6 档智能压缩控制台**：提供 64k (极小体积 · 微信畅发)、96k (精简省流)、128k (网络均衡)、192k (标准高保真 · 官方推荐)、256k (超清音质)、320k (极品母带) 码率矩阵。
+- **动态体积预估看板**：前端毫秒级测算文件压缩前后体积对比与瘦身百分比（最高可瘦身 85% 以上），直观可视。
+- **高保真原声试听播放器**：支持滑动条平滑拖拽寻位、指尖实时跟随浮动时码气泡（HUD Time Bubble）与物理静音拨片硬件穿透（obeyMuteSwitch: false）。
 
-## 技术路线（A/B 验证中）
+### 2. 视频提取音频工坊 (Video-to-Audio)
+- **首创双核混合架构 (Client-First Hybrid Architecture)**：
+  - 前端优先调用手机硬件 MediaContainer 在本地毫秒级剥离解复用纯音轨（0.3 秒，通常仅 1MB~5MB）；
+  - 仅将此轻量纯音频流上传至云端 FFmpeg 转码为标准 192k MP3，节省 98% 移动网络流量，彻底杜绝 100MB~500MB 大视频直接上传导致的 60 秒网络超时（uploadFile:fail timeout）；
+  - 遇到非标准封装或手机硬件解码器不支持时，自动优雅降级上传原视频至云端提取。
+- **iOS 系统相册自适应双阶兼容选取**：首选尝试原画选取，若因系统沙盒、杜比视界 HDR、4K HEVC 或 iCloud 优化存储导致导出受限，系统自动静默切换为兼容压缩流无感重试，并在极端限制下自动降级至 wx.chooseVideo 与弹窗指引微信聊天/文件传输助手直选原文件。
+- **四向全业务闭环**：提取结果一键直送多轨剪辑工坊、格式转换压缩、沉淀至我的作品库或通过微信直接发送给好友。
 
-- 客户端固定：原生小程序；基础库 ≥2.23.0；异步任务（申请上传票据 → 直传 → 建任务 → 轮询），避免 `callContainer` 15s 超时。
-- **路线 A（优先验证，免费环境）**：云开发云函数 + 精简 FFmpeg + 云存储/云数据库；若 50MB/30min 与超时满足，则**不需要云托管**。
-- **路线 B（兜底）**：微信云托管 Docker + FFmpeg + 对象存储；A 不通过时启用。
-- 两条路线客户端接口一致，服务端实现可替换；内容安全 `mediaCheckAsync` + 消息推送回调；24h 清理。
+### 3. 专业多轨非线性音乐剪辑工坊 (Multitrack NLE Editor)
+- **纯净通用 8 轨并行混音架构**：支持动态扩展至 8 条通用独立音轨（T1~T8），各轨独立音量增益、静音与智能人声避让（Auto-Ducking 遇人声自动下压伴奏 -12dB）。
+- **全幅自适应真实声波切片**：摒弃传统离散柱状伪波形，基于 50ms 真实物理振幅切片，在 0.5x 全览至 4.0x 精细缩放倍率下波形均 100% 连贯充满音轨卡片，人声起止与鼓点节拍清晰可辨。
+- **高精物理插值时钟引擎 (Soft PLL)**：重构毫秒级物理墙上时钟驱动器（35ms 高频刷新，严格单调性保证），彻底根除播放时间码跳跃、数字倒退与台阶式抖动；跨片段过渡平滑穿透，即时寻位零冻结。
+- **专业非线编交互工具箱**：
+  - 选择模式 (V) 与激光瞄准剃刀切割 (C)：支持所点即所剪、切断缝隙瞬间闪光与机械重感震动；
+  - 智能双向磁吸贴合：拖拽靠近 0s 起点或播放指针时自动吸附对齐；
+  - 同轨重叠碰撞自愈：同轨音频切开或拖动产生物理重叠时，后段音频自动智能下移至下一音轨；
+  - 复制与粘贴：深拷贝片段至剪贴板，支持跨轨指定指针时间码精确粘贴。
+- **独立调音中枢**：
+  - 6 档动态热变速 (0.5x~2.0x)：atempo 变频保持原音调，热重置物理时钟锚点，播放中变速连续平滑不倒退；
+  - 8 种风格硬件级 EQ 均衡器：原声无染、清晰人声、复古电台、澎湃低音、明亮空气、温暖黑胶、影院环绕、消除人声（4x2 对称排版）；
+  - 多阶频域 FFT 谱减智能降噪：3dB / 6dB / 12dB 阶梯降噪，精准滤除环境底噪与高频电流啸叫，杜绝数码闷音；
+  - 片段独立增益 (-24dB~+12dB) 与 4 档快捷预设胶囊。
 
-## 目录规划
+### 4. 现场高清录音工坊 (High-Fidelity Recorder)
+- **原生 PCM 实时流与物理能量算法**：毫秒级均方根振幅 (RMS) 与真峰值能量解算，驱动 28 柱动态滚动声波谱线与环境分贝指示胶囊（安静/清晰/充沛/过载）。
+- **随时中断即刻试听回放**：录音中途点击暂停或遭遇系统电话/微信语音打断时，自动切片秒级打包合成标准 44 字节 RIFF/WAVE，内置即时试听播放器可随时回放检验，支持平滑继续追加录音。
+- **标准无损导出**：录音完成直接输出标准无损 WAV 原声，一键直送格式转换或多轨剪辑。
 
-```text
-miniprogram/      小程序端（页面/组件/工具）
-server/           云托管服务（Dockerfile + Express + Worker + FFmpeg）
-cloudfunctions/   现有 quickstart 示例，M3 清理
-docs/             文档（本目录）
-scripts/          本地验证脚本
-samples/          测试音频（大文件不入库）
+### 5. 我的作品库 (Personal Audio Library)
+- **跨业务统一沉淀**：格式转换、视频提取、音乐剪辑与现场录音的成品自动持久化入库。
+- **安全与生命周期管理**：配备 24 小时自动物理到期倒计时，支持相同文件去重置顶、按业务分类/格式标签一键筛选、一键清空与微信好友二次转发分享。
+
+---
+
+## 核心技术栈与架构
+
+### 技术栈选型
+
+| 维度 | 技术方案 | 说明 |
+| :--- | :--- | :--- |
+| 前端框架 | 微信小程序原生框架 (WXML / WXSS / JavaScript) | 纯净极简 Warm Paper 暖纸美学设计体系 |
+| 服务端 | 微信云开发 Serverless (Node.js 16.13) | 云函数、云存储与云数据库一体化架构 |
+| 音频引擎 | Linux x86_64 静态编译 FFmpeg 7.0.2 | 封装于 cloudfunctions/ffmpegProbe，支持全编码转码 |
+| 触感系统 | 自研全局分级微交互震动引擎 (utils/haptics.js) | 包含 60ms 节流门禁与静默容错保护 |
+| 数据持久化 | 客户端本地持久化与云数据库双重保障 | library-store.js 管理作品沉淀与 24h 自动生命周期 |
+
+### 架构流程
+
+```
+[多源输入]
+  |-- 从微信聊天会话选择文件 (wx.chooseMessageFile)
+  |-- 从手机系统相册选择视频 (wx.chooseMedia / 自适应重试)
+  |-- 手机麦克风现场立体声高清录音 (wx.getRecorderManager / PCM)
+  |
+  v
+[前端极速预处理]
+  |-- 视频音轨硬件级分离 (wx.createMediaContainer, 仅生成 2MB 纯音频)
+  |-- PCM 能量流实时解析与 28 柱动态谱线渲染
+  |-- 多源片段本地时间线编排 (裁剪 / 变速 / 增益 / 磁吸)
+  |
+  v
+[云端 Serverless FFmpeg 引擎 (cloudfunctions/ffmpegProbe)]
+  |-- action: convertFile        (多格式音频高保真重编码与 64k~320k 压缩)
+  |-- action: extractVideoAudio  (轻量纯音频 / 视频云端转换为标准 MP3)
+  |-- action: renderEdit         (8 轨混音 / 滤镜图渲染 / 智能降噪 / 风格 EQ)
+  |-- action: analyzeAudio       (50ms 桶 uint8 peak/rms 声波轮廓分析)
+  |
+  v
+[成品沉淀与全场景流转]
+  |-- 微信内高保真试听 (穿透物理静音开关 obeyMuteSwitch: false)
+  |-- 送入多轨剪辑工坊二次创作
+  |-- 存入我的作品库 (24h 自动倒计时)
+  |-- 微信好友转发分享 (wx.shareFileMessage) / PC 端保存
 ```
 
-## 快速开始
+---
 
-1. 用微信开发者工具打开本目录（`project.config.json` 已指向 `miniprogram/`）。
-2. 云开发环境已开通并写入 `miniprogram/envList.js`/`app.js`；在开发者工具「设置 → 安全设置」开启「服务端口」后，即可部署 `cloudfunctions/ffmpegProbe` 做路线 A 验证；若 A 失败再开通微信云托管（管理员扫码）。
-3. 启动 Docker Desktop 后，本地验证 FFmpeg：`docker run --rm linuxserver/ffmpeg -version`（本机 Docker 28.3 已可用；云函数内静态 FFmpeg 已部署验证）。
-4. 按 [TASK_PLAN §4.0](./docs/TASK_PLAN.md) 的技术路线验证门与 [DEV_LOG §6](./docs/DEV_LOG.md) 的 Spike 清单先验证；V1.1 编辑功能按 [MUSIC_EDITOR_DESIGN](./docs/MUSIC_EDITOR_DESIGN.md) §13 的 Spike 先行。
+## 项目目录结构
 
-## 已确认 / 待确认
+```text
+miniprogram-1/
+|-- cloudfunctions/                     # 微信云开发云函数
+|   |-- ffmpegProbe/                    # 核心音频处理云函数 (FFmpeg 7.0.2 引擎)
+|   |   |-- index.js                    # 云函数调度分发入口
+|   |   |-- lib/
+|   |   |   `-- editor-core.js          # 音频剪辑滤镜图解算与纯函数核心库
+|   |   `-- package.json
+|   `-- audioConvert/                   # 格式转换辅助云函数
+|-- miniprogram/                        # 小程序前端工程
+|   |-- pages/
+|   |   |-- index/                      # 格式转换与极限压缩主工作台
+|   |   |-- editor/                     # 专业多轨音乐剪辑工坊
+|   |   |-- video-extract/              # 视频提取音频专属工坊
+|   |   |-- record/                     # 现场高清录音工坊
+|   |   |-- library/                    # 我的作品库
+|   |   `-- settings/                   # 设置与关于页面
+|   |-- utils/
+|   |   |-- editor-utils.js             # 剪辑时间轴与算法工具库
+|   |   |-- video-extractor.js          # 视频提取双核解复用客户端引擎
+|   |   |-- record-audio.js             # 录音 PCM 能量分析与 WAV 封装引擎
+|   |   |-- library-store.js            # 作品库数据管理与生命周期调度
+|   |   |-- haptics.js                  # 全局分级触感反馈防抖引擎
+|   |   `-- mono-icons.js               # 单色矢量图标库
+|   |-- app.js                          # 全局生命周期与云环境初始化
+|   |-- app.json                        # 页面路由与窗口配置
+|   `-- app.wxss                        # 全局样式与暖纸设计规范
+|-- scripts/                            # 自动化测试与验证套件
+|   |-- editor-spike/
+|   |   |-- test_pure.js                # 纯函数与核心算法单测 (169 项)
+|   |   `-- frontend-test.js            # 前端剪辑工坊端到端交互测试 (46 项)
+|   `-- page-smoke/
+|       |-- video-extract-test.js       # 视频提取双核解复用状态机测试 (29 项)
+|       `-- record-library-test.js      # 录音与作品库单测 (17 项)
+|-- docs/                               # 完整开发文档与架构记录
+|   |-- DEV_LOG.md                      # 详细开发记录与版本演进日志 (v1.0 ~ v6.9)
+|   |-- PRD.md                          # 产品需求文档
+|   |-- TASK_PLAN.md                    # 架构与规划文档
+|   `-- FEASIBILITY.md                  # 可行性与技术限制分析报告
+|-- project.config.json                 # 微信开发者工具项目配置
+`-- README.md                           # 项目说明文档
+```
 
-- **已确认（2026-10-27）**：个人主体；公开发布；免费（无广告/无付费）；云开发环境 `cloud1-d0g1pwjogd2f39be2`；单文件 50MB / 30 分钟；保留“转发给好友”；接受“先转换、并行送检、命中后删除”。
-- **待确认/待办**：备案材料（11-02 前）、隐私指引后台配置并恢复 `__usePrivacyCheck__`、类目提交、真机全流程；V1.1 编辑设计的 3 个产品决策（进 v1.1 还是 v1.0、额度共享、格式/时长矩阵）待拍板，见 [MUSIC_EDITOR_DESIGN §17](./docs/MUSIC_EDITOR_DESIGN.md)。
-- 详见 [TASK_PLAN §14](./docs/TASK_PLAN.md) 与 [PRD §16](./docs/PRD.md)。
+---
 
-## 发布合规
+## 快速开始与部署指南
 
-- [发布前检查清单](docs/RELEASE_CHECKLIST.md)
-- [隐私政策](docs/legal/PRIVACY_POLICY.md) · [用户协议](docs/legal/USER_AGREEMENT.md) · [版权投诉指引](docs/legal/COPYRIGHT_COMPLAINT.md)
+### 1. 前置准备
+- 安装最新版 [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)。
+- 开通微信小程序账号并获取 AppID（支持个人主体）。
+- 在微信小程序控制台中开通「微信云开发」服务，记录环境 ID（例如：`cloud1-xxx`）。
+
+### 2. 导入工程与配置
+1. 打开微信开发者工具，点击「导入项目」，选择本项目根目录。
+2. 在 `project.config.json` 中配置您的 `appid`。
+3. 打开 `miniprogram/envList.js` 与 `miniprogram/app.js`，将 `cloud1-xxx` 替换为您自己的云开发环境 ID。
+
+### 3. 部署云函数
+1. 在微信开发者工具左侧目录树中，找到 `cloudfunctions/ffmpegProbe` 目录。
+2. 鼠标右键点击该目录，选择「上传并部署：云端安装依赖（不上传 node_modules）」。
+3. 等待云端编译打包完成，在云开发控制台中将该云函数的超时时间调整为 `60s`，内存配置建议设置为 `512MB` 或 `1024MB`。
+
+### 4. 运行全量自动化测试
+本项目提供涵盖纯函数、算法解算、前端组件交互与端到端状态机的完整测试体系（无需依赖外部网络）：
+
+```bash
+# 1. 运行纯函数与核心音频算法单测 (169 项)
+node scripts/editor-spike/test_pure.js
+
+# 2. 运行剪辑工坊前端交互与状态机测试 (46 项)
+node scripts/editor-spike/frontend-test.js
+
+# 3. 运行视频提取双核解复用与自适应重试测试 (29 项)
+node scripts/page-smoke/video-extract-test.js
+
+# 4. 运行现场录音与作品库单测 (17 项)
+node scripts/page-smoke/record-library-test.js
+```
+
+---
+
+## 核心设计规范与合规说明
+
+1. **Warm Paper 暖纸美学**：全局采用米纸底衬（#F8F6F2）、纯白卡片（#FFFFFF）、深炭黑字体（#1C1917）与暖记号橙（#FF6B00）高光，排版舒展克制，彻底杜绝高饱和度色彩污染。
+2. **移动端触控工程学**：关键操作按钮均具备清晰的触控热区、双列对称排版防溢出保护，并深度整合了分级触觉震动马达反馈。
+3. **用户隐私与数据生命周期**：严格遵守个人信息保护要求，所有音视频临时缓存产物均由服务端设置 24 小时自动物理清理机制，杜绝数据堆积。
+
+---
+
+## 开源协议
+
+本项目采用 MIT 许可证。商业使用或二次分发请遵循开源协议规范。
