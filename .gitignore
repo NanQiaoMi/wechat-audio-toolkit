@@ -22,3 +22,4 @@ project.private.config.json
 
 # 构建生成物
 minitool-dist/
+*.zip
