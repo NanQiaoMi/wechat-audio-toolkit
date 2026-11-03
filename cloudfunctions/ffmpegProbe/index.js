@@ -522,6 +522,7 @@ async function convertFile(event) {
     if (!buf || buf.length === 0) throw new Error('源文件为空或下载失败')
     if (buf.length > MAX_FILE_BYTES) throw new Error('文件超过 50MB，请压缩或拆分后重试')
     fs.writeFileSync(inputPath, buf)
+    dl.fileContent = null // 及时解引用释放 Node.js 内存缓冲
 
     const duration = await getDuration(inputPath)
     if (duration > 0) {
@@ -542,6 +543,8 @@ async function convertFile(event) {
     const conv = await runFfmpeg(args, 55000)
     if (!conv.ok) throw new Error(`转码失败：${(conv.stderr || conv.error || '').slice(-300)}`)
     if (!fs.existsSync(outputPath)) throw new Error('转码输出文件不存在')
+    // 转码成功后及时清理输入源文件，腾出容器磁盘
+    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath) } catch (e) {}
     const outSize = fs.statSync(outputPath).size
     if (outSize > 100 * 1024 * 1024) throw new Error('输出文件过大，请降低码率')
 

@@ -240,12 +240,40 @@ Page({
       success: (res) => {
         const item = res && res.tempFiles && res.tempFiles[0];
         if (!item) return;
+        const filePath = item.path || item.tempFilePath;
+        if (!filePath) {
+          wx.showToast({ title: '获取文件路径失败，请重试', icon: 'none' });
+          return;
+        }
+
+        // iOS 容错：检测聊天视频是否已在本地下载完成
+        if (wx.getFileSystemManager) {
+          try {
+            const fs = wx.getFileSystemManager();
+            const stat = fs.statSync(filePath);
+            if (stat && typeof stat.size === 'number' && stat.size > 0 && !item.size) {
+              item.size = stat.size;
+            }
+          } catch (statErr) {
+            wx.showModal({
+              title: '视频尚未下载',
+              content: '该聊天视频尚未在微信中下载，请先在聊天记录中点开播放或下载后再选择。',
+              showCancel: false,
+            });
+            return;
+          }
+        }
+
+        const extMatch = (item.name || filePath).match(/\.([a-zA-Z0-9]+)$/);
+        const ext = extMatch ? extMatch[1].toLowerCase() : 'mp4';
+        const defaultName = `微信视频_${Date.now().toString().slice(-4)}.${ext}`;
+
         this.handleSelectedVideo({
-          tempFilePath: item.path,
+          tempFilePath: filePath,
           size: item.size,
-          duration: 0, // chooseMessageFile 可能不带 duration，由后续解码探测
-          thumbTempFilePath: '',
-          name: item.name || `微信视频_${Date.now().toString().slice(-4)}.mp4`,
+          duration: item.duration || 0, // chooseMessageFile 可能不带 duration，由后续解码探测
+          thumbTempFilePath: item.thumbTempFilePath || '',
+          name: item.name || defaultName,
         });
       },
       fail: (err) => {
@@ -367,13 +395,24 @@ Page({
       const cloudFolder = isAudioOnly ? 'audio_tmp' : 'video_tmp';
       const cloudPath = `${cloudFolder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${cloudExt}`;
 
-      const uploadRes = await wx.cloud.uploadFile({
-        cloudPath,
-        filePath: fileToUpload.tempFilePath,
-      });
+      let uploadRes = null;
+      let lastUpErr = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          uploadRes = await wx.cloud.uploadFile({
+            cloudPath,
+            filePath: fileToUpload.tempFilePath,
+          });
+          if (uploadRes && uploadRes.fileID) break;
+        } catch (upErr) {
+          lastUpErr = upErr;
+          if (attempt === 0) await new Promise(r => setTimeout(r, 600));
+        }
+      }
 
       if (!uploadRes || !uploadRes.fileID) {
-        throw new Error('上传临时文件失败');
+        const upMsg = (lastUpErr && (lastUpErr.errMsg || lastUpErr.message)) || '上传超时或网络异常';
+        throw new Error(`上传临时文件失败（${upMsg}）`);
       }
 
       const cloudRes = await videoExtractor.extractAudioViaCloud(uploadRes.fileID, displayName, {

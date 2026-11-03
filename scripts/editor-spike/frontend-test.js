@@ -631,6 +631,12 @@ function createWxStub(options) {
       chooseIndex++;
       if (payload.success) payload.success({ tempFiles: files });
     },
+    getFileSystemManager() {
+      if (opts.fileSystemManager) return opts.fileSystemManager;
+      return {
+        statSync() { return { size: 1024 * 1024 }; },
+      };
+    },
     shareFileMessage(payload) {
       calls.share.push(payload);
       if (payload.success) payload.success();
@@ -638,6 +644,9 @@ function createWxStub(options) {
     cloud: {
       uploadFile(payload) {
         calls.upload.push(payload);
+        if (typeof opts.uploadFile === 'function') {
+          return opts.uploadFile(payload);
+        }
         return Promise.resolve({ fileID: 'cloud://test.edit/' + payload.cloudPath });
       },
       callFunction(payload) {
@@ -2458,6 +2467,64 @@ smokeTest('声音工具箱非破坏性实时音效调节与均衡器/变速网�
   assert.ok(editorWxss.includes('.chips-selector-row.speed-grid'), '必须包含 speed-grid 样式');
   assert.ok(editorWxss.includes('.chips-selector-row.eq-grid'), '必须包含 eq-grid 样式');
   assert.ok(editorWxss.includes('.chips-selector-row.denoise-grid'), '必须包含 denoise-grid 样式');
+
+  page.onUnload();
+});
+
+smokeTest('iOS端聊天文件获取与容灾上传优化验证', async () => {
+  let uploadAttempts = 0;
+  const stub = createWxStub({
+    platform: 'ios',
+    chooseBatches: [
+      [
+        // 1. 未在微信本地下载的文件（statSync 抛错）
+        { tempFilePath: 'wxfile://tmp/not_downloaded.mp3', name: '未下载.mp3', size: 0 },
+        // 2. 大写后缀且使用 tempFilePath 的正常文件
+        { tempFilePath: 'wxfile://tmp/REAL_RECORDING.MP3', name: 'REAL_RECORDING.MP3', size: 2 * 1024 * 1024 },
+      ],
+    ],
+    fileSystemManager: {
+      statSync(p) {
+        if (p.includes('not_downloaded')) {
+          throw new Error('file not found');
+        }
+        return { size: 2 * 1024 * 1024 };
+      },
+    },
+    uploadFile(payload) {
+      uploadAttempts++;
+      if (uploadAttempts === 1) {
+        return Promise.reject(new Error('uploadFile:fail timeout'));
+      }
+      return Promise.resolve({ fileID: 'cloud://test.edit/' + payload.cloudPath });
+    },
+    analyzeResults: [makeAnalyzeResponse({ duration: 30 })],
+  });
+
+  const page = loadEditorPage(stub.wx);
+  page.onLoad();
+  page.onShow();
+
+  page.chooseAudioFiles();
+
+  // 1. 验证 wx.chooseMessageFile 参数：type 为 all，且无 extension 参数
+  assert.strictEqual(stub.calls.chooseFile.length, 1);
+  const chooseCall = stub.calls.chooseFile[0];
+  assert.strictEqual(chooseCall.type, 'all', '必须使用 type: all 兼容 iOS 聊天各类消息');
+  assert.strictEqual(chooseCall.extension, undefined, 'type 为 all 时不得传 extension，规避 iOS 微信接口异常');
+
+  await wait(800);
+
+  // 2. 验证未下载文件被友好拦截，未导致崩溃
+  assert.strictEqual(page.preRejects.length, 0);
+  assert.strictEqual(page.data.importFailures.length, 1, '未下载文件应进入 importFailures');
+  assert.ok(page.data.importFailures[0].message.includes('尚未在微信中下载'), '文案应明确引导去聊天记录下载');
+
+  // 3. 验证正常文件成功上传与重试
+  assert.strictEqual(uploadAttempts, 2, '上传遇到超时应自动重试第 2 次');
+  assert.strictEqual(page.sources.length, 1, '大写 MP3 文件应成功导入为 1 个源');
+  assert.strictEqual(page.clips.length, 1, '应成功生成 1 个片段');
+  assert.strictEqual(page.data.status, 'editing');
 
   page.onUnload();
 });

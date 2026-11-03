@@ -863,6 +863,128 @@ async function runAll() {
     assert.strictEqual(capturedMessageOpts.type, 'all', 'type 必须为 all 兼容原文件与视频');
   });
 
+  await itAsync('chooseMessageVideo: iOS 端未下载文件检测与 tempFilePath 兼容', async () => {
+    let modalShown = null;
+    let handledFile = null;
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    // 1. 模拟未下载文件：statSync 抛错
+    global.wx = {
+      chooseMessageFile: (opts) => {
+        opts.success({
+          tempFiles: [{
+            tempFilePath: 'wxfile://tmp/undownloaded_chat_video.mp4',
+            size: 0,
+            name: '未下载视频.mp4',
+          }],
+        });
+      },
+      getFileSystemManager: () => ({
+        statSync: () => {
+          throw new Error('file not found');
+        },
+      }),
+      showModal: (opts) => {
+        modalShown = opts;
+      },
+      showToast: () => {},
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+      handleSelectedVideo(f) { handledFile = f; },
+    });
+
+    page.chooseMessageVideo();
+    assert.ok(modalShown, '未下载文件应弹出提示弹窗');
+    assert.strictEqual(modalShown.title, '视频尚未下载');
+    assert.strictEqual(handledFile, null, '未下载文件绝不可进入提取管道');
+
+    // 2. 模拟已下载文件：statSync 成功并兼容 tempFilePath
+    modalShown = null;
+    global.wx.getFileSystemManager = () => ({
+      statSync: () => ({ size: 1024 * 1024 }),
+    });
+
+    page.chooseMessageVideo();
+    assert.strictEqual(modalShown, null);
+    assert.ok(handledFile, '已下载文件顺利进入 handleSelectedVideo');
+    assert.strictEqual(handledFile.tempFilePath, 'wxfile://tmp/undownloaded_chat_video.mp4');
+  });
+
+  await itAsync('startCloudExtraction: iOS 端上传临时文件支持自动重试', async () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let uploadAttempts = 0;
+    global.wx = {
+      cloud: {
+        uploadFile: async () => {
+          uploadAttempts++;
+          if (uploadAttempts === 1) {
+            throw new Error('uploadFile:fail timeout');
+          }
+          return { fileID: 'cloud://test/retry_video.mp4' };
+        },
+        downloadFile: async () => ({ tempFilePath: 'wxfile://tmp/extracted.mp3' }),
+        callFunction: ({ data, success }) => {
+          if (success) {
+            success({
+              result: {
+                success: true,
+                fileID: 'cloud://bucket/audio_out.mp3',
+                duration: 10,
+                format: 'mp3',
+                size: 1024 * 1024,
+              },
+            });
+          }
+        },
+      },
+      showToast: () => {},
+      showModal: () => {},
+      createInnerAudioContext: () => ({
+        obeyMuteSwitch: true,
+        set src(v) {},
+        play: () => {},
+        stop: () => {},
+        pause: () => {},
+        seek: () => {},
+        destroy: () => {},
+        onPlay: () => {},
+        onPause: () => {},
+        onStop: () => {},
+        onEnded: () => {},
+        onTimeUpdate: () => {},
+        onError: () => {},
+        onCanplay: () => {},
+      }),
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+      stopAudio: () => {},
+      updateSaveState: () => {},
+    });
+
+    await page.startCloudExtraction({
+      tempFilePath: 'wxfile://tmp/test.mp4',
+      name: 'test.mp4',
+      size: 5 * 1024 * 1024,
+      duration: 10,
+    });
+
+    assert.strictEqual(uploadAttempts, 2, '上传遇到瞬态异常应自动重试');
+    assert.strictEqual(page.data.status, 'success');
+  });
+
   it('videoExtractor.MAX_CLOUD_VIDEO_BYTES: 同步放宽至 500MB', () => {
     assert.strictEqual(videoExtractor.MAX_CLOUD_VIDEO_BYTES, 500 * 1024 * 1024);
   });

@@ -330,16 +330,42 @@ Page({
 
   /**
    * 选择音频文件 (从微信聊天会话)
+   * iOS 微信适配优化：
+   * 1. 采用 type: 'all' 且不传 extension 参数，避免 iOS 抛出 invalid parameter 或过滤大写扩展名；
+   * 2. 在 JS 侧对文件做大小写不敏感扩展名校验；
+   * 3. 校验本地文件是否存在，捕获未在微信中下载的聊天文件并给出明确引导。
    */
   chooseAudioFile() {
     this.stopAllAudio();
     wx.chooseMessageFile({
       count: 1,
       type: 'all',
-      extension: ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'amr', 'wma', 'ape', 'mp4', 'mov'],
       success: res => {
         if (!res.tempFiles || res.tempFiles.length === 0) return;
         const file = res.tempFiles[0];
+        const filePath = file.path || file.tempFilePath;
+        if (!filePath) {
+          wx.showToast({ title: '获取文件路径失败，请重试', icon: 'none' });
+          return;
+        }
+
+        // iOS 关键容错：检测微信聊天文件是否已在本地下载完成
+        if (wx.getFileSystemManager) {
+          try {
+            const fs = wx.getFileSystemManager();
+            const stat = fs.statSync(filePath);
+            if (stat && typeof stat.size === 'number' && stat.size > 0 && !file.size) {
+              file.size = stat.size;
+            }
+          } catch (statErr) {
+            wx.showModal({
+              title: '文件尚未下载',
+              content: '该聊天文件尚未在微信中下载，请先在聊天记录中点击下载后再选择。',
+              showCancel: false,
+            });
+            return;
+          }
+        }
 
         // 校验大小：限制 50MB
         const maxBytes = 50 * 1024 * 1024;
@@ -352,10 +378,21 @@ Page({
           return;
         }
 
-        // 提取扩展名
-        const extMatch = file.name.match(/\.([a-zA-Z0-9]+)$/);
-        const extName = extMatch ? extMatch[1].toUpperCase() : 'AUDIO';
+        // 提取扩展名（不区分大小写，支持大写 .MP3/.WAV）
+        const extMatch = (file.name || filePath).match(/\.([a-zA-Z0-9]+)$/);
+        const extName = extMatch ? extMatch[1].toUpperCase() : 'MP3';
         const extLower = extName.toLowerCase();
+
+        // 格式支持范围
+        const supported = ['mp3', 'wav', 'aac', 'm4a', 'flac', 'ogg', 'amr', 'wma', 'ape', 'mp4', 'mov'];
+        if (!supported.includes(extLower)) {
+          wx.showModal({
+            title: '格式不支持',
+            content: `暂不支持 .${extLower} 格式文件，请选择常见的音频（MP3、WAV、AAC、M4A、FLAC、OGG 等）或视频文件。`,
+            showCancel: false,
+          });
+          return;
+        }
 
         // 判断是否直接在前端可试听 (mp3, aac, m4a, wav 直接支持)
         const playableFormats = ['mp3', 'aac', 'm4a', 'wav'];
@@ -363,8 +400,8 @@ Page({
 
         this.setData({
           sourceFile: {
-            path: file.path,
-            name: file.name,
+            path: filePath,
+            name: file.name || `音频_${Date.now().toString().slice(-4)}.${extLower}`,
             size: file.size,
             sizeText: formatBytes(file.size),
             extName: extName,
@@ -382,7 +419,7 @@ Page({
 
         // 若可试听，配置试听源
         if (sourcePlayable && this.sourceAudioCtx) {
-          this.sourceAudioCtx.src = file.path;
+          this.sourceAudioCtx.src = filePath;
         }
       },
       fail: err => {
@@ -556,6 +593,51 @@ Page({
   },
 
   /**
+   * 稳健上传本地文件至云存储（支持自动重试与 iOS 本地文件有效性检测）
+   */
+  async uploadFileWithRetry(cloudPath, filePath, maxRetries = 1) {
+    if (wx.getFileSystemManager) {
+      try {
+        const fs = wx.getFileSystemManager();
+        const stat = fs.statSync(filePath);
+        if (stat && stat.size === 0) {
+          throw new Error('本地文件内容为空，请重新在微信中选择');
+        }
+      } catch (statErr) {
+        if (statErr.message && statErr.message.includes('本地文件内容为空')) {
+          throw statErr;
+        }
+        throw new Error('本地临时文件不存在或已被微信清理，请重新在聊天中选择');
+      }
+    }
+
+    let lastError = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await wx.cloud.uploadFile({ cloudPath, filePath });
+        if (res && res.fileID) {
+          return res;
+        }
+        throw new Error('上传云存储未返回有效 fileID');
+      } catch (err) {
+        lastError = err;
+        console.warn(`[index] 上传云存储尝试 ${attempt + 1} 失败:`, err);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+    }
+    const msg = (lastError && (lastError.errMsg || lastError.message)) || '上传云存储超时或网络异常';
+    if (msg.includes('file not found') || msg.includes('no such file')) {
+      throw new Error('本地文件已失效，请重新选择文件');
+    }
+    if (msg.includes('timeout') || msg.includes('fail')) {
+      throw new Error(`上传失败(${msg})，请检查网络连接后重试`);
+    }
+    throw new Error(msg);
+  },
+
+  /**
    * 启动转码流程
    */
   async startConvert() {
@@ -594,10 +676,7 @@ Page({
       const randomKey = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const cloudPath = `temp_audios/${randomKey}.${sourceFile.extLower}`;
 
-      const uploadRes = await wx.cloud.uploadFile({
-        cloudPath,
-        filePath: sourceFile.path,
-      });
+      const uploadRes = await this.uploadFileWithRetry(cloudPath, sourceFile.path);
 
       if (!uploadRes.fileID) {
         throw new Error('上传云存储失败，未返回 fileID');
@@ -694,9 +773,16 @@ Page({
     } catch (err) {
       console.error('转码过程错误:', err);
       this.setData({ status: 'IDLE', statusText: '准备就绪' });
+      const rawMsg = (err && (err.message || err.errMsg)) || '';
+      let friendlyMsg = rawMsg;
+      if (rawMsg.includes('ffmpegProbe') || rawMsg.includes('-501000') || rawMsg.includes('FUNCTION_NOT_FOUND')) {
+        friendlyMsg = '请检查是否已在微信开发者工具中部署 ffmpegProbe 云函数。';
+      } else if (!friendlyMsg) {
+        friendlyMsg = '转码服务暂时不可用，请稍后重试。';
+      }
       wx.showModal({
-        title: '转码失败',
-        content: err.message || '请检查是否已在微信开发者工具中部署 ffmpegProbe 云函数。',
+        title: '转码未完成',
+        content: friendlyMsg,
         showCancel: false,
       });
     }
