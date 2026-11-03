@@ -620,12 +620,86 @@ async function runAll() {
       duration: 180,
     });
 
-    // 核心断言：直接发起云端提取，上传原视频至 video_tmp 由云端 FFmpeg 解构
-    assert.strictEqual(uploadedFilePath, 'wxfile://tmp/huge_movie_200mb.mp4', '直接上传视频由云端提取');
-    assert.ok(uploadedCloudPath.startsWith('video_tmp/'), '必须上传至 video_tmp 视频暂存目录');
+    // 核心断言：本地已剥离 3.5MB 纯音频，仅上传纯音频至 audio_tmp，规避 200MB 巨型视频上传超时
+    assert.strictEqual(uploadedFilePath, 'wxfile://tmp/demuxed_audio.m4a', '仅上传 3.5MB 纯音频，省流量 98%');
+    assert.ok(uploadedCloudPath.startsWith('audio_tmp/'), '必须上传至 audio_tmp 音频暂存目录');
     assert.strictEqual(page.data.status, 'success');
     assert.strictEqual(page.data.extractMode, 'cloud');
-    assert.ok(page.data.speedDescText.indexOf('云端转码') >= 0, '结果摘要包含云端转码说明');
+    assert.ok(page.data.speedDescText.indexOf('省流量') >= 0 || page.data.speedDescText.indexOf('仅传') >= 0, '结果摘要包含省流量说明');
+  });
+
+  await itAsync('video-extract page: 本地解复用不支持或抛错时，安全降级上传原视频至 video_tmp', async () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let uploadedRawFilePath = '';
+    let uploadedRawCloudPath = '';
+
+    global.wx = {
+      createInnerAudioContext: () => ({
+        obeyMuteSwitch: true,
+        set src(v) {},
+        play: () => {},
+        stop: () => {},
+        pause: () => {},
+        seek: () => {},
+        destroy: () => {},
+        onPlay: () => {},
+        onPause: () => {},
+        onStop: () => {},
+        onEnded: () => {},
+        onTimeUpdate: () => {},
+        onError: () => {},
+        onCanplay: () => {},
+      }),
+      createMediaContainer: () => {
+        throw new Error('Native MediaContainer crashed');
+      },
+      showToast: () => {},
+      showModal: () => {},
+      cloud: {
+        uploadFile: async ({ cloudPath, filePath }) => {
+          uploadedRawCloudPath = cloudPath;
+          uploadedRawFilePath = filePath;
+          return { fileID: 'cloud://bucket/video_tmp/fallback.mp4' };
+        },
+        callFunction: ({ data, success }) => {
+          if (success) {
+            success({
+              result: {
+                success: true,
+                fileID: 'cloud://bucket/audio_out.mp3',
+                duration: 90,
+                format: 'mp3',
+                size: 2 * 1024 * 1024,
+              },
+            });
+          }
+        },
+        downloadFile: async () => ({ tempFilePath: 'wxfile://tmp/downloaded_fallback.mp3' }),
+      },
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+    });
+
+    page.onLoad();
+
+    await page.handleSelectedVideo({
+      tempFilePath: 'wxfile://tmp/raw_video_fallback.mp4',
+      name: '待降级视频.mp4',
+      size: 15 * 1024 * 1024,
+      duration: 90,
+    });
+
+    assert.strictEqual(uploadedRawFilePath, 'wxfile://tmp/raw_video_fallback.mp4', '本地解复用失败时降级上传原视频');
+    assert.ok(uploadedRawCloudPath.startsWith('video_tmp/'), '必须上传至 video_tmp');
+    assert.strictEqual(page.data.status, 'success');
+    assert.strictEqual(page.data.extractMode, 'cloud');
   });
 
   await itAsync('chooseAlbumVideo: wx.chooseMedia 强制传入 sizeType: [original] 且 compressed: false 规避微信原生压缩与音频解码失败', async () => {
@@ -690,8 +764,10 @@ async function runAll() {
     require('../../miniprogram/pages/video-extract/video-extract.js');
 
     let messageFileCalled = false;
+    let chooseMediaCalls = [];
     global.wx = {
       chooseMedia: (opts) => {
+        chooseMediaCalls.push(opts);
         opts.fail({ errMsg: 'chooseMedia:fail audio decode error' });
       },
       chooseMessageFile: (opts) => {
@@ -710,10 +786,57 @@ async function runAll() {
     });
 
     page.chooseAlbumVideo();
+    assert.strictEqual(chooseMediaCalls.length, 2, '必须在首次失败后自动静默进行兼容重试');
+    assert.strictEqual(chooseMediaCalls[0].compressed, false, '第一次尝试原画');
+    assert.strictEqual(chooseMediaCalls[1].compressed, true, '第二次尝试兼容压缩');
     assert.ok(modalShown, '必须弹出友好指导弹窗');
     assert.strictEqual(modalShown.title, '相册转码受限');
     assert.ok(modalShown.content.indexOf('从聊天会话选取') >= 0);
     assert.strictEqual(messageFileCalled, true, '确认转入聊天选取必须调用 chooseMessageFile');
+  });
+
+  await itAsync('chooseAlbumVideo: 首次 compressed: false 失败后，静默重试 compressed: true 成功则正常进入提取流程', async () => {
+    let pageConfig = null;
+    global.Page = (cfg) => { pageConfig = cfg; };
+    delete require.cache[require.resolve('../../miniprogram/pages/video-extract/video-extract.js')];
+    require('../../miniprogram/pages/video-extract/video-extract.js');
+
+    let attempts = 0;
+    let handledFile = null;
+
+    global.wx = {
+      chooseMedia: (opts) => {
+        attempts++;
+        if (attempts === 1) {
+          assert.strictEqual(opts.compressed, false);
+          opts.fail({ errMsg: 'chooseMedia:fail export failed' });
+        } else {
+          assert.strictEqual(opts.compressed, true);
+          opts.success({
+            tempFiles: [{
+              tempFilePath: 'wxfile://tmp/ios_compatible.mp4',
+              size: 8 * 1024 * 1024,
+              duration: 45,
+            }],
+          });
+        }
+      },
+      showToast: () => {},
+      showModal: () => {},
+    };
+
+    const page = Object.assign({}, pageConfig, {
+      data: JSON.parse(JSON.stringify(pageConfig.data)),
+      setData(patch) { Object.assign(this.data, patch); },
+      handleSelectedVideo(file) {
+        handledFile = file;
+      },
+    });
+
+    page.chooseAlbumVideo();
+    assert.strictEqual(attempts, 2, '自适应重试应触发两次');
+    assert.ok(handledFile, '重试成功后正常进入 handleSelectedVideo');
+    assert.strictEqual(handledFile.tempFilePath, 'wxfile://tmp/ios_compatible.mp4');
   });
 
   await itAsync('chooseMessageVideo: 采用 type: all 兼容视频与文件形式，彻底绕过相册压缩', async () => {

@@ -353,51 +353,69 @@ function extractAudioViaCloud(fileID, fileName = 'video.mp4', options = {}) {
       return;
     }
 
-    wx.cloud.callFunction({
-      name: 'ffmpegProbe',
-      data: {
-        action: 'extractVideoAudio',
-        fileID,
-        fileName,
-        targetFormat: options.targetFormat || 'mp3',
-        options: {
-          bitrate: options.bitrate || '192k',
-        },
-      },
-      success: (res) => {
-        const result = res && res.result;
-        if (result && result.success) {
-          resolve({
-            success: true,
-            mode: 'cloud',
-            fileID: result.fileID,
-            tempFilePath: '', // 云端文件，需要播放时通过 cloud.downloadFile 或 getTempFileURL 获取
-            duration: result.duration || 0,
-            durationText: result.durationText || formatSeconds(result.duration || 0),
-            size: result.size || 0,
-            sizeText: result.sizeText || formatBytes(result.size || 0),
-            format: result.format || 'mp3',
-          });
-        } else {
-          resolve({
-            success: false,
-            mode: 'cloud',
-            errorMessage: result && result.errorMessage || '云端音轨提取失败',
-          });
-        }
-      },
-      fail: (err) => {
-        let msg = `云函数调用失败: ${err && err.errMsg || err}`;
-        if (msg.indexOf('FUNCTION_NOT_FOUND') >= 0 || msg.indexOf('not found') >= 0) {
-          msg += ' (请先在微信开发者工具中右键 cloudfunctions/ffmpegProbe 目录点击「上传并部署：云端安装依赖」)';
-        }
+    let settled = false;
+    const handleSuccess = (res) => {
+      if (settled) return;
+      settled = true;
+      const result = res && res.result;
+      if (result && (result.success || (result.code === 0 && (result.fileID || result.fileId)))) {
+        const outFID = result.fileID || result.fileId;
+        resolve({
+          success: true,
+          mode: 'cloud',
+          fileID: outFID,
+          tempFilePath: '', // 云端文件，需要播放时通过 cloud.downloadFile 或 getTempFileURL 获取
+          duration: result.duration || 0,
+          durationText: result.durationText || formatSeconds(result.duration || 0),
+          size: result.size || 0,
+          sizeText: result.sizeText || formatBytes(result.size || 0),
+          format: result.format || 'mp3',
+        });
+      } else {
         resolve({
           success: false,
           mode: 'cloud',
-          errorMessage: msg,
+          errorMessage: (result && result.errorMessage) || '云端音轨提取失败',
         });
-      },
-    });
+      }
+    };
+
+    const handleFail = (err) => {
+      if (settled) return;
+      settled = true;
+      let msg = `云函数调用失败: ${(err && err.errMsg) || err}`;
+      if (msg.indexOf('FUNCTION_NOT_FOUND') >= 0 || msg.indexOf('not found') >= 0) {
+        msg += ' (请先在微信开发者工具中右键 cloudfunctions/ffmpegProbe 目录点击「上传并部署：云端安装依赖」)';
+      }
+      resolve({
+        success: false,
+        mode: 'cloud',
+        errorMessage: msg,
+      });
+    };
+
+    try {
+      const callPromise = wx.cloud.callFunction({
+        name: 'ffmpegProbe',
+        data: {
+          action: 'extractVideoAudio',
+          fileID,
+          fileName,
+          targetFormat: options.targetFormat || 'mp3',
+          options: {
+            bitrate: options.bitrate || '192k',
+          },
+        },
+        success: handleSuccess,
+        fail: handleFail,
+      });
+
+      if (callPromise && typeof callPromise.then === 'function') {
+        callPromise.then(handleSuccess).catch(handleFail);
+      }
+    } catch (callErr) {
+      handleFail(callErr);
+    }
   });
 }
 

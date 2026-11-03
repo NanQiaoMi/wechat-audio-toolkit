@@ -131,8 +131,13 @@ Page({
 
   /**
    * 通道 1：从手机系统相册选取视频
+   * 采用「自适应兼容双阶选取」：
+   * 1. 优先尝试原画选取（compressed: false, sizeType: ['original']）；
+   * 2. 若因 iOS 系统沙盒/杜比视界HDR/iCloud优化存储导出受限，自动静默无感降级为兼容压缩模式重试；
+   * 3. 若 chooseMedia 彻底失败，继续自动降级至 wx.chooseVideo 兼容链路。
+   * @param {boolean} [isRetry=false] 是否为自动重试阶段
    */
-  chooseAlbumVideo() {
+  chooseAlbumVideo(isRetry = false) {
     if (typeof wx === 'undefined') return;
 
     if (wx.chooseMedia) {
@@ -140,8 +145,8 @@ Page({
         count: 1,
         mediaType: ['video'],
         sourceType: ['album'], // 纯相册，直接调起相册选取
-        sizeType: ['original'], // 请求原视频
-        compressed: false, // 【微信官方 2.25.0+ 关键属性】显式声明不压缩视频
+        sizeType: isRetry ? ['compressed', 'original'] : ['original'], // 请求原视频，重试时启用兼容模式
+        compressed: isRetry ? true : false, // 首次显式不压缩，iOS HDR/iCloud受限时自动以兼容模式重试
         success: (res) => {
           const item = res && res.tempFiles && res.tempFiles[0];
           if (!item) return;
@@ -155,50 +160,69 @@ Page({
         },
         fail: (err) => {
           if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
-          console.warn('[video-extract] chooseMedia 失败:', err);
-          wx.showModal({
-            title: '相册转码受限',
-            content: '该视频触发了微信相册底层转码限制（通常因包含杜比/多声道/高码率音轨）。\n\n建议点击下方【从聊天会话选取】，直接在微信聊天记录或「文件传输助手」中选择该视频，100% 避开相册压缩直接秒级提取！',
-            confirmText: '从聊天选取',
-            cancelText: '取消',
-            success: (modalRes) => {
-              if (modalRes.confirm) {
-                this.chooseMessageVideo();
-              }
-            },
-          });
+          console.warn(`[video-extract] chooseMedia 失败 (isRetry=${isRetry}):`, err);
+          if (!isRetry) {
+            // iOS 针对 HDR/杜比视界/iCloud优化存储等，compressed: false 可能受限，静默使用兼容模式重试
+            return this.chooseAlbumVideo(true);
+          }
+          // chooseMedia 重试仍然失败，尝试使用兼容 API chooseVideo
+          this.fallbackChooseVideo(false);
         },
       });
     } else if (wx.chooseVideo) {
-      wx.chooseVideo({
-        sourceType: ['album'],
-        compressed: false, // 【关键】禁用微信原生压缩，规避原生压缩器解码失败
-        success: (res) => {
-          this.handleSelectedVideo({
-            tempFilePath: res.tempFilePath,
-            size: res.size,
-            duration: res.duration,
-            thumbTempFilePath: res.thumbTempFilePath || '',
-            name: `相册视频_${Date.now().toString().slice(-4)}.mp4`,
-          });
-        },
-        fail: (err) => {
-          if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
-          console.warn('[video-extract] chooseVideo 失败:', err);
-          wx.showModal({
-            title: '相册转码受限',
-            content: '该视频触发了微信相册转码限制，建议使用「从微信聊天会话选取」。',
-            confirmText: '从聊天选取',
-            cancelText: '取消',
-            success: (modalRes) => {
-              if (modalRes.confirm) {
-                this.chooseMessageVideo();
-              }
-            },
-          });
-        },
-      });
+      this.fallbackChooseVideo(isRetry);
     }
+  },
+
+  /**
+   * 相册选取降级 API (wx.chooseVideo)
+   * @param {boolean} [isRetry=false] 是否为重试阶段
+   */
+  fallbackChooseVideo(isRetry = false) {
+    if (typeof wx === 'undefined' || !wx.chooseVideo) {
+      this.showAlbumFailedModal();
+      return;
+    }
+
+    wx.chooseVideo({
+      sourceType: ['album'],
+      compressed: isRetry ? true : false,
+      success: (res) => {
+        this.handleSelectedVideo({
+          tempFilePath: res.tempFilePath,
+          size: res.size,
+          duration: res.duration,
+          thumbTempFilePath: res.thumbTempFilePath || '',
+          name: `相册视频_${Date.now().toString().slice(-4)}.mp4`,
+        });
+      },
+      fail: (err) => {
+        if (err && (err.errMsg || '').indexOf('cancel') >= 0) return;
+        console.warn(`[video-extract] chooseVideo 失败 (isRetry=${isRetry}):`, err);
+        if (!isRetry) {
+          return this.fallbackChooseVideo(true);
+        }
+        this.showAlbumFailedModal();
+      },
+    });
+  },
+
+  /**
+   * 相册视频无法读取时的友好引导弹框
+   */
+  showAlbumFailedModal() {
+    if (typeof wx === 'undefined' || !wx.showModal) return;
+    wx.showModal({
+      title: '相册转码受限',
+      content: '该视频可能因包含杜比视界/HDR/iCloud云端未完全下载或系统相册沙盒限制。\n\n建议点击下方【从聊天会话选取】，直接在微信聊天记录或「文件传输助手」中选择该视频，100% 避开相册压缩直接秒级提取！',
+      confirmText: '从聊天选取',
+      cancelText: '取消',
+      success: (modalRes) => {
+        if (modalRes && modalRes.confirm) {
+          this.chooseMessageVideo();
+        }
+      },
+    });
   },
 
   /**
@@ -251,8 +275,8 @@ Page({
     this.setData({
       status: 'extracting',
       isCloudProcessing: true,
-      extractTitle: '正在上传视频至云端提取…',
-      extractSubTip: check.largeNotice || '云端 FFmpeg 7.0 强力引擎，100% 格式兼容，转为通用高音质 MP3',
+      extractTitle: '正在分析视频音轨…',
+      extractSubTip: check.largeNotice || '正在优化提取链路，准备转为高品质 MP3…',
       videoInfo: {
         name: rawFile.name || '未命名视频.mp4',
         size: rawFile.size,
@@ -268,8 +292,39 @@ Page({
 
     const startTime = Date.now();
 
-    // 🚀 用户指定：不走本地解封装上传，直接发起云端高精转码抽取（100% 格式兼容，规避手机芯片解码限制）
-    await this.startCloudExtraction(rawFile, startTime);
+    // 双核极速架构：
+    // 1. 优先调用手机硬件引擎在本地极速分离纯音频（通常仅 1MB~5MB）
+    // 2. 将轻量纯音频极速秒传至云端 FFmpeg 7.0 转为通用 MP3
+    // 既满足云端高质量 FFmpeg 转码，又彻底避免 iOS 移动网络上传 100MB~500MB 原视频导致的超时与断流！
+    let localResult = null;
+    try {
+      this.setData({
+        extractTitle: '正在本地极速分离纯音频…',
+        extractSubTip: '利用手机硬件引擎快速剥离音轨，免除大视频上传等待',
+      });
+      localResult = await videoExtractor.extractAudioLocally(rawFile.tempFilePath);
+    } catch (e) {
+      console.warn('[video-extract] 本地分离音轨异常，自动降级原视频上传:', e);
+    }
+
+    if (localResult && (localResult.tempFilePath || localResult.localAudioFilePath)) {
+      const audioPath = localResult.tempFilePath || localResult.localAudioFilePath;
+      const audioSize = localResult.size || localResult.localAudioSize || 0;
+      const audioDuration = localResult.duration || durSec;
+      const baseName = (rawFile.name || '相册视频').replace(/\.[^.]+$/, '');
+
+      await this.startCloudExtraction({
+        tempFilePath: audioPath,
+        size: audioSize,
+        duration: audioDuration,
+        name: `${baseName}_audio.m4a`,
+        isAudioOnlyUpload: true,
+        sourceVideoName: rawFile.name,
+      }, startTime);
+    } else {
+      // 本地硬件解复用不支持（极少数老旧机型或特殊封装），自动降级为上传原视频
+      await this.startCloudExtraction(rawFile, startTime);
+    }
   },
 
   /**
