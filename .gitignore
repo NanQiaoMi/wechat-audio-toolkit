@@ -19,3 +19,6 @@ project.private.config.json
 
 # 规划/侦察临时目录
 .dsh-plan/
+
+# 构建生成物
+minitool-dist/

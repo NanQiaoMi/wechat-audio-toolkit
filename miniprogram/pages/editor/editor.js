@@ -736,10 +736,10 @@ Page({
     }
     this.choosingFile = true;
     this.stopAllPlayback();
+    // iOS 兼容性提升：采用 type: 'all' 且不传 extension 参数，避免 iOS 微信将大写后缀过滤或抛出 invalid parameter
     wx.chooseMessageFile({
       count: remaining,
-      type: 'file',
-      extension: editorUtils.AUDIO_EXTENSIONS,
+      type: 'all',
       success: (res) => this.handleFilesPicked(res),
       fail: (err) => this.handleChooseFail(err),
     });
@@ -772,12 +772,29 @@ Page({
     const remaining = MAX_SOURCES - this.sources.length;
     const accepted = [];
     const rejected = [];
+    const fs = wx.getFileSystemManager ? wx.getFileSystemManager() : null;
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const filePath = file.path || file.tempFilePath;
       if (accepted.length >= remaining) {
         rejected.push({ name: file.name, message: '最多支持 ' + MAX_SOURCES + ' 个音频源，多余文件未导入' });
         continue;
       }
+
+      // iOS 容错：检测聊天文件是否已在本地下载完成
+      if (fs && fs.statSync && filePath) {
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat && typeof stat.size === 'number' && stat.size > 0 && !file.size) {
+            file.size = stat.size;
+          }
+        } catch (statErr) {
+          rejected.push({ name: file.name, message: '文件尚未在微信中下载，请先在聊天记录中点击下载' });
+          continue;
+        }
+      }
+
       const check = editorUtils.validateLocalFile(file, { maxBytes: MAX_FILE_BYTES });
       if (!check.ok) {
         rejected.push({ name: file.name, message: check.message });
@@ -831,6 +848,7 @@ Page({
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
+      const filePath = (item.file && (item.file.path || item.file.tempFilePath)) || '';
       this.setData({
         status: STATUS.UPLOADING,
         stageText: '正在上传 ' + (i + 1) + '/' + total + '…',
@@ -843,9 +861,20 @@ Page({
           Date.now(),
           Math.random().toString(36).slice(2, 8) + i
         );
-        const uploadRes = await wx.cloud.uploadFile({ cloudPath: cloudPath, filePath: item.file.path });
+        let uploadRes = null;
+        let lastErr = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            uploadRes = await wx.cloud.uploadFile({ cloudPath: cloudPath, filePath: filePath });
+            if (uploadRes && uploadRes.fileID) break;
+          } catch (upErr) {
+            lastErr = upErr;
+            if (attempt === 0) await new Promise(r => setTimeout(r, 600));
+          }
+        }
         if (!uploadRes || !uploadRes.fileID) {
-          throw this.makeImportError('upload', '上传失败：云端未返回文件 ID，请检查网络后重试。');
+          const upMsg = (lastErr && (lastErr.errMsg || lastErr.message)) || '上传超时或网络异常';
+          throw this.makeImportError('upload', '上传失败：' + upMsg + '，请检查网络后重试。');
         }
 
         this.setData({
