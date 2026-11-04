@@ -230,9 +230,9 @@
 }
 
 .empty-actions {
-  display: flex;
-  align-items: stretch;
-  gap: 12rpx;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
   width: 100%;
   margin-top: 36rpx;
 }
@@ -288,8 +288,12 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.filter-empty-icon {
-  font-size: 48rpx;
+.filter-empty-icon,
+.filter-empty-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background-color: #D6D3D1;
   margin-bottom: 16rpx;
 }
 
@@ -371,6 +375,16 @@
   color: #57534E;
 }
 
+.kind-badge.kind-record {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.kind-badge.kind-extract {
+  background-color: #F5F3FF;
+  color: #7C3AED;
+}
+
 .item-time {
   font-size: 20rpx;
   color: #A8A29E;
@@ -429,6 +443,14 @@
 
 .expired-tip-icon {
   font-size: 22rpx;
+}
+
+.expired-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background-color: #A8A29E;
+  margin-right: 6rpx;
 }
 
 .expired-tip-text {

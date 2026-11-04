@@ -4,12 +4,11 @@
   <!-- 1. 顶部极简品牌条 -->
   <view class="page-topbar">
     <view class="topbar-title-group">
-      <text class="topbar-main">🎬 视频提取音频</text>
+      <text class="topbar-main">视频提取音频</text>
       <text class="topbar-sub">支持相册短视频 / 微信聊天视频 · 毫秒级极速剥离</text>
     </view>
     <view class="topbar-actions">
       <view class="topbar-pill-btn" bindtap="goLibrary">
-        <text class="topbar-pill-icon">📚</text>
         <text>我的作品</text>
       </view>
     </view>
@@ -20,7 +19,7 @@
     <view class="picker-dropzone">
       <view class="picker-clapperboard-icon">
         <view class="clapperboard-top"></view>
-        <view class="clapperboard-sparkle">🎬</view>
+        <view class="clapperboard-sparkle">MP4</view>
       </view>
 
       <text class="picker-main-title">选取视频，提取无损原声音频</text>
@@ -28,17 +27,15 @@
 
       <view class="picker-actions-column">
         <button class="primary-picker-btn" bindtap="chooseAlbumVideo" hover-class="picker-btn-hover">
-          <text class="picker-btn-icon">📱</text>
           <text class="picker-btn-label">从手机相册选取视频</text>
         </button>
         <button class="secondary-picker-btn" bindtap="chooseMessageVideo" hover-class="picker-btn-hover">
-          <text class="picker-btn-icon">💬</text>
           <text class="picker-btn-label">从微信聊天会话选取（推荐）</text>
         </button>
       </view>
 
       <view class="picker-tip-box">
-        <text class="tip-icon">💡</text>
+        <text class="tip-dot"></text>
         <text class="tip-text">提示：部分手机相册视频（如高画质/杜比/多声道）受微信底层转码限制会提示“解码失败”，此时请将视频发至「文件传输助手」，点击上方「从微信聊天会话选取」，可 100% 避开相册压缩直接秒级提取！</text>
       </view>
 
@@ -53,7 +50,7 @@
     <view class="extract-anim-box">
       <view class="extract-pulse-ring ring-1"></view>
       <view class="extract-pulse-ring ring-2"></view>
-      <view class="extract-center-icon">⚡</view>
+      <view class="extract-center-dot"></view>
     </view>
 
     <text class="extract-status-title">{{extractTitle}}</text>
@@ -65,7 +62,7 @@
     </view>
 
     <view class="extract-mode-badge {{isCloudProcessing ? 'cloud' : 'local'}}">
-      <text>{{isCloudProcessing ? '☁️ 云端高精度转码抽取中…' : '⚡ 本地芯片级容器解复用中…'}}</text>
+      <text>{{isCloudProcessing ? '云端高精度转码抽取中…' : '本地芯片级容器解复用中…'}}</text>
     </view>
   </view>
 
@@ -75,7 +72,7 @@
     <!-- 头部成功指示行 (左右对齐，绝不错位) -->
     <view class="result-top-badge">
       <view class="result-title-group">
-        <text class="success-icon">✓</text>
+        <text class="success-icon"></text>
         <text class="success-title">提取成功！</text>
       </view>
       <text class="cost-tag">{{speedDescText}}</text>
@@ -90,7 +87,7 @@
       </view>
 
       <view class="comp-center-divider">
-        <text class="comp-arrow-symbol">➔</text>
+        <text class="comp-arrow-symbol">→</text>
         <text wx:if="{{savedRatio > 0}}" class="comp-saved-badge">瘦身 {{savedRatio}}%</text>
         <text wx:else class="comp-saved-badge">纯音频</text>
       </view>
@@ -104,14 +101,14 @@
 
     <!-- 提取音频元数据标题行 (单行截断，图标标签绝对居中对齐) -->
     <view class="extracted-title-bar">
-      <view class="meta-icon-box">🎶</view>
+      <view class="meta-icon-box">AUD</view>
       <view class="meta-content">
         <text class="extracted-audio-name">{{resultAudio.title}}</text>
         <view class="meta-badges-row">
           <text class="pill-badge codec-badge">{{resultAudio.formatUpper}}</text>
           <text class="pill-badge time-badge">{{resultAudio.durationText}}</text>
           <text class="pill-badge size-badge">{{resultAudio.sizeText}}</text>
-          <text wx:if="{{extractMode === 'local'}}" class="pill-badge cloud-convert-badge" bindtap="reExtractViaCloud">☁️ 转为标准MP3</text>
+          <text wx:if="{{extractMode === 'local'}}" class="pill-badge cloud-convert-badge" bindtap="reExtractViaCloud">转为标准MP3</text>
         </view>
       </view>
     </view>
@@ -120,7 +117,7 @@
     <view class="result-audition-box">
       <view class="audition-header-row">
         <view class="audition-title-wrap">
-          <text class="audition-title">🎧 纯音频原声试听</text>
+          <text class="audition-title">纯音频原声试听</text>
           <view wx:if="{{isPlaying}}" class="audition-playing-badge">
             <text class="wave-dot-anim"></text>
             <text class="playing-txt">播放中</text>
@@ -132,7 +129,7 @@
       <!-- 内联试听播放条 -->
       <view class="inline-player result-inline-player">
         <view class="player-play-btn result-play-btn {{isPlaying ? 'playing' : ''}}" bindtap="togglePlayAudio" hover-class="play-btn-hover">
-          <text class="play-btn-icon">{{isPlaying ? '⏸' : '▶'}}</text>
+          <text class="play-btn-icon">{{isPlaying ? '暂停' : '试听'}}</text>
         </view>
         
         <view class="player-progress-area">
@@ -163,18 +160,15 @@
     <view class="result-action-buttons">
       <!-- 英雄级主按钮：送入多轨剪辑 (全宽 92rpx 暖橙胶囊，唯一高亮主行动) -->
       <button class="export-btn primary-editor" bindtap="sendToEditor" hover-class="btn-hover-active">
-        <text class="btn-icon-emoji">✂️</text>
         <text class="btn-label-text">送入多轨剪辑</text>
       </button>
 
       <!-- 双列操作区：发给好友 / 保存至手机 (双列同质感，高级沉稳 Warm Neutral) -->
       <view class="sub-export-row">
         <button class="export-btn sub-btn primary-share" bindtap="shareOrSaveAudio" hover-class="btn-hover-active">
-          <text class="btn-icon-emoji">🚀</text>
           <text class="btn-label-text">发给微信好友</text>
         </button>
         <button class="export-btn sub-btn secondary-save" bindtap="saveToLocalDisk" hover-class="btn-hover-active">
-          <text class="btn-icon-emoji">💾</text>
           <text class="btn-label-text">保存至手机</text>
         </button>
       </view>
@@ -183,23 +177,20 @@
     <!-- 辅助工具：格式转换与压缩 (优雅静音卡片) -->
     <view class="converter-utility-card" bindtap="sendToConverter" hover-class="utility-hover">
       <view class="utility-left">
-        <text class="utility-icon">⚡</text>
         <view class="utility-text-group">
           <text class="utility-title">转格式 / 压缩音频</text>
           <text class="utility-sub">转 MP3/WAV/FLAC 或一键极限压缩</text>
         </view>
       </view>
-      <text class="utility-arrow">➔</text>
+      <text class="utility-arrow">→</text>
     </view>
 
     <!-- 底部辅助行：我的作品 + 重新提取 (与首页统一) -->
     <view class="aux-links-row">
       <view class="aux-link-item library-link" bindtap="goLibrary">
-        <text class="aux-link-icon">📚</text>
         <text class="aux-link-text">我的作品 (已自动入库)</text>
       </view>
       <view class="aux-link-item reset-btn" bindtap="resetToPicker">
-        <text class="aux-link-icon">🔄</text>
         <text class="aux-link-text">重新提取</text>
       </view>
     </view>
@@ -208,7 +199,6 @@
 
   <!-- 5. 错误提示卡片 (Error Card) -->
   <view wx:elif="{{status === 'error'}}" class="card-panel error-card">
-    <view class="error-icon-box">⚠️</view>
     <text class="error-main-msg">音频提取遇到问题</text>
     <text class="error-detail-msg">{{errorMessage}}</text>
     <view class="error-actions-row">
@@ -218,6 +208,6 @@
 
   <!-- 6. 底部技术说明 -->
   <view class="page-footer">
-    <text class="footer-tip">💡 提示：短视频背景音乐、电影原声、语音讲解均可高保真秒级剥离</text>
+    <text class="footer-tip">提示：短视频背景音乐、电影原声、语音讲解均可高保真秒级剥离</text>
   </view>
 </view>
