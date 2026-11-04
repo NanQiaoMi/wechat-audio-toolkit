@@ -182,6 +182,54 @@ test('itemFromEdit: 剪辑产物入库数据映射正确', () => {
   assert.strictEqual(item.extra.clipCount, 4);
 });
 
+test('itemFromRecord: 录音结果入库数据映射正确', () => {
+  const recordResult = {
+    fileName: '现场录音_20261104.wav',
+    size: 1024000,
+    sizeText: '1.0 MB',
+    durationText: '00:32',
+    tempFilePath: 'wxfile://tmp/rec.wav'
+  };
+  const item = libraryStore.itemFromRecord(recordResult);
+  assert.strictEqual(item.kind, 'record');
+  assert.strictEqual(item.format, 'wav');
+  assert.strictEqual(item.name, '现场录音_20261104.wav');
+  assert.strictEqual(item.tempFilePath, 'wxfile://tmp/rec.wav');
+});
+
+test('itemFromExtract: 视频提取音频入库数据映射正确', () => {
+  const extractResult = {
+    title: '短剧原声音频',
+    size: 3145728,
+    sizeText: '3.0 MB',
+    durationText: '02:15',
+    format: 'mp3',
+    tempFilePath: 'wxfile://tmp/extract.mp3',
+    fileID: 'cloud://env/extract.mp3'
+  };
+  const item = libraryStore.itemFromExtract(extractResult);
+  assert.strictEqual(item.kind, 'extract');
+  assert.strictEqual(item.format, 'mp3');
+  assert.strictEqual(item.name, '短剧原声音频');
+  assert.strictEqual(item.fileID, 'cloud://env/extract.mp3');
+});
+
+test('stats: 正确统计全部及4个独立分类数量', () => {
+  const items = [
+    { id: '1', kind: 'convert', createdAt: Date.now() },
+    { id: '2', kind: 'convert', createdAt: Date.now() },
+    { id: '3', kind: 'edit', createdAt: Date.now() },
+    { id: '4', kind: 'record', createdAt: Date.now() },
+    { id: '5', kind: 'extract', createdAt: Date.now() },
+  ];
+  const result = libraryStore.stats(items);
+  assert.strictEqual(result.total, 5);
+  assert.strictEqual(result.convert, 2);
+  assert.strictEqual(result.edit, 1);
+  assert.strictEqual(result.record, 1);
+  assert.strictEqual(result.extract, 1);
+});
+
 console.log('\n# 页面级冒烟与桩测试');
 
 function makeWxStub() {
@@ -248,7 +296,11 @@ function makeWxStub() {
         onError() {},
         onFrameRecorded() {},
       };
-    }
+    },
+    shareFileMessage(opts) { if (opts.success) opts.success(); },
+    saveFileToDisk(opts) { if (opts.success) opts.success(); },
+    getSystemInfoSync() { return { platform: 'ios' }; },
+    reLaunch() {}
   };
 }
 
@@ -432,5 +484,133 @@ test('library.js: 模块定义、加载与类型筛选切换', () => {
   }
 });
 
-console.log(`\n============================================\n录音与作品库单测: pass=${passCount} fail=0\n全部通过 ✅\n`);
+test('record.js: onSaveToLibrary 与 onShareLocalFile 逻辑验证', () => {
+  const originalWx = global.wx;
+  const originalPage = global.Page;
+  let pageInstance = null;
+  let shareCalled = false;
+  let toastMsg = '';
+
+  const stub = makeWxStub();
+  stub.shareFileMessage = (opts) => {
+    shareCalled = true;
+    opts.success();
+  };
+  stub.showToast = (opts) => {
+    toastMsg = opts.title;
+  };
+  global.wx = stub;
+  global.Page = (opts) => {
+    pageInstance = Object.assign({}, opts, {
+      setData(patch) {
+        Object.assign(this.data, patch);
+      }
+    });
+  };
+
+  try {
+    delete require.cache[require.resolve('../../miniprogram/pages/record/record.js')];
+    require('../../miniprogram/pages/record/record.js');
+    pageInstance.onLoad();
+
+    pageInstance.data.status = 'review';
+    pageInstance.data.fileName = '现场录音_20261104.wav';
+    pageInstance.data.tempFilePath = 'wxfile://tmp/rec.wav';
+    pageInstance.data.durationSec = 15;
+    pageInstance.data.durationText = '00:15';
+    pageInstance.data.sizeText = '500 KB';
+    pageInstance.fileSizeBytes = 500000;
+
+    // 1. 存入作品库
+    assert.strictEqual(pageInstance.data.isSavedToLibrary, false);
+    pageInstance.onSaveToLibrary();
+    assert.strictEqual(pageInstance.data.isSavedToLibrary, true);
+    assert.strictEqual(toastMsg, '已存入我的作品');
+
+    // 重复点击提示已在作品库
+    pageInstance.onSaveToLibrary();
+    assert.strictEqual(toastMsg, '已在作品库中');
+
+    // 2. 分享本地录音
+    pageInstance.onShareLocalFile();
+    assert.strictEqual(shareCalled, true);
+  } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
+    global.wx = originalWx;
+    global.Page = originalPage;
+  }
+});
+
+test('library.js: 5 标签过滤与快捷入口与路由跳转', () => {
+  const originalWx = global.wx;
+  const originalPage = global.Page;
+  let pageInstance = null;
+  let navUrl = '';
+  let reLaunchUrl = '';
+
+  const stub = makeWxStub();
+  stub.navigateTo = (opts) => { navUrl = opts.url; };
+  stub.reLaunch = (opts) => { reLaunchUrl = opts.url; };
+  global.wx = stub;
+  global.Page = (opts) => {
+    pageInstance = Object.assign({}, opts, {
+      setData(patch) {
+        Object.assign(this.data, patch);
+      }
+    });
+  };
+
+  try {
+    delete require.cache[require.resolve('../../miniprogram/pages/library/library.js')];
+    require('../../miniprogram/pages/library/library.js');
+
+    // 校验 5 个过滤标签
+    assert.strictEqual(pageInstance.data.filterTabs.length, 5);
+    const keys = pageInstance.data.filterTabs.map(t => t.key);
+    assert.deepStrictEqual(keys, ['all', 'convert', 'edit', 'record', 'extract']);
+
+    // 校验 4 个快捷入口路由
+    pageInstance.goIndex();
+    assert.strictEqual(navUrl, '/pages/index/index');
+
+    pageInstance.goEditor();
+    assert.strictEqual(navUrl, '/pages/editor/editor');
+
+    pageInstance.goRecord();
+    assert.strictEqual(navUrl, '/pages/record/record');
+
+    pageInstance.goVideoExtract();
+    assert.strictEqual(navUrl, '/pages/video-extract/video-extract');
+
+    // 校验 onItemTap 分类跳转
+    pageInstance.data.items = [
+      { id: 'rec_1', kind: 'record' },
+      { id: 'ext_1', kind: 'extract' },
+      { id: 'edt_1', kind: 'edit' },
+      { id: 'cvt_1', kind: 'convert' }
+    ];
+
+    navUrl = '';
+    pageInstance.onItemTap({ currentTarget: { dataset: { id: 'rec_1' } } });
+    assert.strictEqual(navUrl, '/pages/record/record');
+
+    navUrl = '';
+    pageInstance.onItemTap({ currentTarget: { dataset: { id: 'ext_1' } } });
+    assert.strictEqual(navUrl, '/pages/video-extract/video-extract');
+
+    navUrl = '';
+    pageInstance.onItemTap({ currentTarget: { dataset: { id: 'edt_1' } } });
+    assert.strictEqual(navUrl, '/pages/editor/editor');
+
+    navUrl = '';
+    pageInstance.onItemTap({ currentTarget: { dataset: { id: 'cvt_1' } } });
+    assert.strictEqual(navUrl, '/pages/index/index');
+  } finally {
+    try { pageInstance.onUnload(); } catch (e) {}
+    global.wx = originalWx;
+    global.Page = originalPage;
+  }
+});
+
+console.log(`\n============================================\n录音与作品库单测: pass=${passCount} fail=0\n全部通过\n`);
 process.exit(0);

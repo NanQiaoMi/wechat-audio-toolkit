@@ -5,8 +5,10 @@ const libraryStore = require('../../utils/library-store.js');
 
 const FILTER_TABS = [
   { key: 'all', label: '全部' },
-  { key: 'convert', label: '转换' },
-  { key: 'edit', label: '剪辑' },
+  { key: 'convert', label: '格式转换' },
+  { key: 'edit', label: '音乐剪辑' },
+  { key: 'record', label: '现场录音' },
+  { key: 'extract', label: '视频提取' },
 ];
 
 function pad2(n) {
@@ -86,7 +88,7 @@ Page({
     const filterTabs = FILTER_TABS.map((tab) => ({
       key: tab.key,
       label: tab.label,
-      count: tab.key === 'all' ? summary.total : tab.key === 'convert' ? summary.convert : summary.edit,
+      count: tab.key === 'all' ? summary.total : (summary[tab.key] || 0),
     }));
 
     const filtered = [];
@@ -97,7 +99,7 @@ Page({
       filtered.push(this.decorateItem(item, now));
     }
 
-    let statsText = '转换与剪辑的作品会汇总在这里';
+    let statsText = '转换、剪辑、录音与提取作品会自动汇总在这里';
     if (summary.total > 0) {
       statsText = '共 ' + summary.total + ' 个作品 · 云端保留 24h';
       if (summary.expired > 0) statsText += ' · ' + summary.expired + ' 个已过期';
@@ -121,18 +123,35 @@ Page({
     if (item.kind === 'edit') {
       if (extra.clipCount) extraLabel = extra.clipCount + ' 个片段';
       else if (extra.targetFormat) extraLabel = '目标 ' + extra.targetFormat;
+    } else if (item.kind === 'record') {
+      extraLabel = '高清录音';
+    } else if (item.kind === 'extract') {
+      extraLabel = '视频提取';
     } else if (extra.targetFormat) {
       extraLabel = '目标 ' + extra.targetFormat;
     }
 
+    let kindLabel = '格式转换';
+    let kindClass = 'kind-convert';
+    if (item.kind === 'edit') {
+      kindLabel = '音乐剪辑';
+      kindClass = 'kind-edit';
+    } else if (item.kind === 'record') {
+      kindLabel = '现场录音';
+      kindClass = 'kind-record';
+    } else if (item.kind === 'extract') {
+      kindLabel = '视频提取';
+      kindClass = 'kind-extract';
+    }
+
     return Object.assign({}, item, {
-      kindLabel: item.kind === 'edit' ? '✂️ 剪辑' : '🔄 转换',
-      kindClass: item.kind === 'edit' ? 'kind-edit' : 'kind-convert',
+      kindLabel,
+      kindClass,
       formatLabel: String(item.format || '').toUpperCase(),
       extraLabel,
       createdText: formatCreatedAt(item.createdAt),
       expired,
-      canCopyLink: item.kind === 'convert' && !!item.downloadUrl && !expired,
+      canCopyLink: !!item.downloadUrl && !expired,
     });
   },
 
@@ -163,6 +182,12 @@ Page({
     // 兜底：极端情况下（如 onLoad 未执行/页面复用时）保证缓存表可用
     if (!this.tempPathCache) this.tempPathCache = Object.create(null);
     if (!this.downloading) this.downloading = Object.create(null);
+
+    // 本地临时文件（如现场录音）可直接快速调起分享
+    if (item.tempFilePath) {
+      this.shareLocalFile(item.tempFilePath, this.shareFileName(item));
+      return;
+    }
 
     if (libraryStore.isExpired(item)) {
       this.showExpiredModal();
@@ -371,13 +396,30 @@ Page({
     });
   },
 
+  goVideoExtract() {
+    wx.navigateTo({
+      url: '/pages/video-extract/video-extract',
+      fail: () => wx.showToast({ title: '视频提取页打开失败', icon: 'none' }),
+    });
+  },
+
   /** 点击卡片：回到对应工具继续处理（本轮不做跨页回填） */
   onItemTap(e) {
     const item = this.findItem(e);
     if (!item) return;
     if (item.kind === 'edit') {
-      wx.showToast({ title: '打开剪辑工具', icon: 'none' });
+      wx.showToast({ title: '打开剪辑工坊', icon: 'none' });
       this.goEditor();
+      return;
+    }
+    if (item.kind === 'record') {
+      wx.showToast({ title: '打开现场录音', icon: 'none' });
+      this.goRecord();
+      return;
+    }
+    if (item.kind === 'extract') {
+      wx.showToast({ title: '打开视频提取', icon: 'none' });
+      this.goVideoExtract();
       return;
     }
     this.goIndex();

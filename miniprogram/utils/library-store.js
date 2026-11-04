@@ -36,7 +36,7 @@ var LEGACY_KEY = 'audio_convert_history';
 var VERSION = 1;
 var MAX_ITEMS = 50;
 var TTL_MS = 24 * 60 * 60 * 1000;
-var KINDS = ['convert', 'edit'];
+var KINDS = ['convert', 'edit', 'record', 'extract'];
 var SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 
 /* ========================================================================== */
@@ -134,18 +134,37 @@ function formatDurationText(seconds) {
 function normalizeItem(raw, now) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
 
-  var kind = raw.kind === 'edit' ? 'edit' : 'convert';
+  var rawKind = toTrimmedString(raw.kind).toLowerCase();
+  var rawSource = toTrimmedString(raw.source || (raw.extra && raw.extra.source)).toLowerCase();
+  var kind = 'convert';
+  if (rawKind === 'edit') {
+    kind = 'edit';
+  } else if (rawKind === 'record' || rawSource === 'record') {
+    kind = 'record';
+  } else if (rawKind === 'extract' || rawKind === 'video-extract' || rawKind === 'video_extract' || rawSource === 'video_extract' || rawSource === 'video-extract') {
+    kind = 'extract';
+  }
+
   var name = toTrimmedString(raw.name) || toTrimmedString(raw.targetFileName) || toTrimmedString(raw.fileName);
   var fileID = toTrimmedString(raw.fileID);
   var downloadUrl = toTrimmedString(raw.downloadUrl) || toTrimmedString(raw.url);
-  if (!name && !fileID && !downloadUrl) return null;
+  var tempFilePath = toTrimmedString(raw.tempFilePath || raw.path);
+  if (!name && !fileID && !downloadUrl && !tempFilePath) return null;
 
   var createdAt = toNumber(raw.createdAt, 0);
   if (!createdAt || createdAt <= 0) createdAt = resolveNow(now);
 
   var format = normalizeFormat(raw.format, name);
-  if (!format && kind === 'edit') format = 'mp3';
-  if (!name) name = (kind === 'edit' ? '剪辑作品' : '转换结果') + (format ? '.' + format : '');
+  if (!format) {
+    format = (kind === 'edit' || kind === 'record' || kind === 'extract') ? 'mp3' : 'mp3';
+  }
+  if (!name) {
+    if (kind === 'edit') name = '剪辑作品';
+    else if (kind === 'record') name = '现场录音';
+    else if (kind === 'extract') name = '视频提取原声';
+    else name = '转换结果';
+    name += (format ? '.' + format : '');
+  }
 
   var size = toNumber(raw.size, 0);
   if (!isFinite(size) || size < 0) size = 0;
@@ -183,6 +202,7 @@ function normalizeItem(raw, now) {
     durationText: durationText,
     fileID: fileID,
     downloadUrl: downloadUrl,
+    tempFilePath: tempFilePath,
     createdAt: createdAt,
     expiresAt: expiresAt,
     extra: extra,
@@ -339,6 +359,78 @@ function itemFromEdit(data, now) {
   );
 }
 
+/**
+ * 现场录音结果 → item。
+ * @param {Object} data { name?, path?, tempFilePath?, size, durationSec?, durationText? }
+ */
+function itemFromRecord(data, now) {
+  if (!data || typeof data !== 'object') return null;
+  var ts = resolveNow(now);
+  var createdAt = toNumber(data.createdAt, 0) || ts;
+  var name = toTrimmedString(data.name || data.fileName) || ('现场录音_' + Math.floor(createdAt).toString().slice(-4) + '.wav');
+  var format = normalizeFormat(data.format, name) || 'wav';
+  var size = toNumber(data.size || data.fileSize, 0);
+  var durationText = toTrimmedString(data.durationText) || formatDurationText(data.durationSec || data.duration);
+
+  return normalizeItem(
+    {
+      kind: 'record',
+      name: name,
+      sourceName: '现场录音',
+      format: format,
+      size: size,
+      sizeText: toTrimmedString(data.sizeText) || formatBytes(size),
+      durationText: durationText,
+      tempFilePath: data.path || data.tempFilePath || '',
+      fileID: data.fileID || '',
+      downloadUrl: data.downloadUrl || '',
+      createdAt: createdAt,
+      extra: {
+        durationSec: toNumber(data.durationSec || data.duration, 0),
+      },
+    },
+    createdAt
+  );
+}
+
+/**
+ * 视频提取结果 → item。
+ * @param {Object} data { title?, name?, tempFilePath?, fileID?, duration?, durationText?, size?, format?, sourceVideoName? }
+ */
+function itemFromExtract(data, now) {
+  if (!data || typeof data !== 'object') return null;
+  var ts = resolveNow(now);
+  var createdAt = toNumber(data.createdAt, 0) || ts;
+  var srcName = toTrimmedString(data.sourceVideoName || data.sourceName);
+  var name = toTrimmedString(data.title || data.name);
+  if (!name) {
+    name = srcName ? (srcName.replace(/\.[^.]+$/, '') + '_原声.mp3') : '视频提取原声.mp3';
+  }
+  var format = normalizeFormat(data.format, name) || 'mp3';
+  var size = toNumber(data.size, 0);
+  var durationText = toTrimmedString(data.durationText) || formatDurationText(data.duration);
+
+  return normalizeItem(
+    {
+      kind: 'extract',
+      name: name,
+      sourceName: srcName || '视频原声',
+      format: format,
+      size: size,
+      sizeText: toTrimmedString(data.sizeText) || formatBytes(size),
+      durationText: durationText,
+      tempFilePath: data.tempFilePath || '',
+      fileID: data.fileID || '',
+      downloadUrl: data.downloadUrl || '',
+      createdAt: createdAt,
+      extra: {
+        sourceVideoName: srcName,
+      },
+    },
+    createdAt
+  );
+}
+
 /* ========================================================================== */
 /* 纯函数：增删 / 过期 / 统计 / 旧数据合并                                     */
 /* ========================================================================== */
@@ -397,15 +489,17 @@ function isExpired(item, now) {
   return ts > expiresAt;
 }
 
-/** 统计：{ total, convert, edit, expired }。 */
+/** 统计：{ total, convert, edit, record, extract, expired }。 */
 function stats(list, now) {
   var arr = asArray(list);
-  var result = { total: 0, convert: 0, edit: 0, expired: 0 };
+  var result = { total: 0, convert: 0, edit: 0, record: 0, extract: 0, expired: 0 };
   for (var i = 0; i < arr.length; i++) {
     var item = arr[i];
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     result.total += 1;
     if (item.kind === 'edit') result.edit += 1;
+    else if (item.kind === 'record') result.record += 1;
+    else if (item.kind === 'extract') result.extract += 1;
     else result.convert += 1;
     if (isExpired(item, now)) result.expired += 1;
   }
@@ -562,6 +656,8 @@ module.exports = {
   normalizeList: normalizeList,
   itemFromConvert: itemFromConvert,
   itemFromEdit: itemFromEdit,
+  itemFromRecord: itemFromRecord,
+  itemFromExtract: itemFromExtract,
   addItem: addItem,
   removeItem: removeItem,
   sortItems: sortItems,

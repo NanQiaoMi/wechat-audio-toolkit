@@ -448,6 +448,8 @@ function buildLibraryItem({
   return {
     id: `ve_${now}_${Math.random().toString(36).slice(2, 7)}`,
     title: safeTitle,
+    name: safeTitle,
+    kind: 'extract',
     format: String(format).toLowerCase(),
     duration: dur,
     durationText: formatSeconds(dur),

@@ -5,7 +5,7 @@ const FEEDBACK_EMAIL = 'feedback@example.com';
 
 Page({
   data: {
-    version: '5.1.0',
+    version: '7.0.0',
     feedbackEmail: FEEDBACK_EMAIL
   },
 
@@ -17,7 +17,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '音频工具箱 · 格式转换 / 剪辑 / 录音，一站搞定',
+      title: '音频工具箱 · 格式转换 / 剪辑 / 录音 / 视频提取，一站搞定',
       path: '/pages/index/index'
     };
   },
@@ -26,8 +26,16 @@ Page({
     wx.reLaunch({ url: '/pages/index/index' });
   },
 
+  goEditor() {
+    wx.navigateTo({ url: '/pages/editor/editor' });
+  },
+
   goRecord() {
     wx.navigateTo({ url: '/pages/record/record?from=settings' });
+  },
+
+  goVideoExtract() {
+    wx.navigateTo({ url: '/pages/video-extract/video-extract' });
   },
 
   goLibrary() {
@@ -80,7 +88,7 @@ Page({
   showAbout() {
     wx.showModal({
       title: '关于',
-      content: '音频工具箱 v' + this.data.version + '\n格式转换 · 多轨剪辑 · 现场录音\n技术：微信云开发 + FFmpeg 7.0.2\n录音/剪辑上限 10 分钟，单文件 ≤ 50MB\n所有音频仅用于本次处理，云端 24 小时内自动清理。',
+      content: '音频工具箱 v' + this.data.version + '\n格式转换 · 多轨剪辑 · 现场录音 · 视频提取\n技术：微信云开发 + FFmpeg 7.0.2\n录音/剪辑上限 10 分钟，视频提取 ≤ 200MB / 15 分钟，单文件 ≤ 50MB\n所有音频仅用于本次处理，云端 24 小时内自动清理。',
       showCancel: false
     });
   },

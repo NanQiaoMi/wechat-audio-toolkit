@@ -15,7 +15,7 @@
   <!-- 异常提示卡（权限 / 隐私 / 录音失败） -->
   <view wx:if="{{errorText}}" class="error-card">
     <view class="error-head">
-      <text class="error-icon">⚠️</text>
+      <text class="error-icon">!</text>
       <text class="error-title">{{errorTitle}}</text>
     </view>
     <text class="error-body">{{errorText}}</text>
@@ -32,7 +32,7 @@
     <view wx:if="{{status === 'idle'}}" class="idle-stage">
       <view class="record-orb" bindtap="onStartRecord" hover-class="record-orb-hover">
         <view class="record-orb-ring"></view>
-        <text class="orb-icon">🎙️</text>
+        <view class="orb-mic-mark"></view>
         <text class="orb-label">开始录音</text>
       </view>
       <text class="idle-hint">点击开始录音</text>
@@ -52,7 +52,7 @@
           <text>正在录音</text>
         </view>
         <view class="live-decibel-pill {{liveDecibelLevel}}">
-          <text class="live-decibel-icon">🎙️</text>
+          <view class="decibel-mic-dot"></view>
           <text class="live-decibel-val">{{liveDecibelText}}</text>
           <text class="live-decibel-desc">· {{liveDecibelStatus}}</text>
         </view>
@@ -77,11 +77,11 @@
 
       <view class="control-row">
         <view class="ctrl-btn ghost" bindtap="onPauseRecord" hover-class="btn-hover">
-          <text class="ctrl-icon">⏸</text>
+          <text class="ctrl-icon">暂停</text>
           <text>暂停并试听</text>
         </view>
         <view class="ctrl-btn finish" bindtap="onFinishRecord" hover-class="btn-hover">
-          <text class="ctrl-icon">✓</text>
+          <text class="ctrl-icon">完成</text>
           <text>完成录音</text>
         </view>
       </view>
@@ -99,7 +99,7 @@
 
       <!-- 系统来电/语音中断提示 -->
       <view wx:if="{{interrupted}}" class="interruption-alert-card">
-        <text class="interruption-alert-icon">⚠️</text>
+        <view class="interruption-alert-dot"></view>
         <view class="interruption-alert-body">
           <text class="interruption-alert-title">录音被电话/系统通话打断</text>
           <text class="interruption-alert-sub">已为您安全保留前 {{elapsedText}} 录音，可立即试听回放或继续追加录音</text>
@@ -110,7 +110,7 @@
       <view class="paused-audition-card">
         <view class="paused-audition-header">
           <view class="audition-header-left">
-            <text class="audition-icon">🎧</text>
+            <view class="audition-icon-dot"></view>
             <text class="audition-title">已录片段即刻回放</text>
           </view>
           <text class="audition-dur-pill">{{pausedDurationText || elapsedText}}</text>
@@ -118,7 +118,7 @@
 
         <view class="paused-player-body">
           <view class="paused-play-btn {{pausedIsPlaying ? 'playing' : ''}}" bindtap="onTogglePausedPreview" hover-class="btn-hover">
-            <text class="paused-play-icon">{{pausedIsPlaying ? '⏸' : '▶'}}</text>
+            <text class="paused-play-icon">{{pausedIsPlaying ? '暂停' : '试听'}}</text>
           </view>
           <view class="paused-slider-column">
             <view wx:if="{{isPausedScrubbing}}" class="scrubbing-time-bubble" style="left: {{pausedScrubbingPercent}}%;">
@@ -159,11 +159,11 @@
 
       <view class="control-row paused-actions">
         <view class="ctrl-btn ghost accent" bindtap="onResumeRecord" hover-class="btn-hover">
-          <text class="ctrl-icon">▶</text>
+          <text class="ctrl-icon">继续</text>
           <text>继续录音</text>
         </view>
         <view class="ctrl-btn finish" bindtap="onFinishRecord" hover-class="btn-hover">
-          <text class="ctrl-icon">✓</text>
+          <text class="ctrl-icon">完成</text>
           <text>完成录音</text>
         </view>
       </view>
@@ -179,7 +179,7 @@
       </view>
 
       <view class="review-file">
-        <view class="file-emoji">🎧</view>
+        <view class="file-badge">REC</view>
         <view class="file-meta">
           <text class="file-name">{{fileName}}</text>
           <text class="file-spec">{{durationText}} · {{sizeText}} · 高保真原声</text>
@@ -188,7 +188,7 @@
 
       <view class="preview-player">
         <view class="player-toggle {{isPlaying ? 'playing' : ''}}" bindtap="onTogglePreview" hover-class="btn-hover">
-          <text>{{isPlaying ? '⏸' : '▶'}}</text>
+          <text>{{isPlaying ? '暂停' : '试听'}}</text>
         </view>
         <view class="player-slider-wrap">
           <view wx:if="{{isPreviewScrubbing}}" class="scrubbing-time-bubble" style="left: {{previewScrubbingPercent}}%;">
@@ -217,12 +217,18 @@
 
       <view class="action-col">
         <view class="primary-action" bindtap="onGoConvert" hover-class="btn-hover">
-          <text>⚡</text>
-          <text>去转换</text>
+          <text>格式转换</text>
         </view>
         <view class="secondary-action" bindtap="onGoEditor" hover-class="btn-hover">
-          <text>✂️</text>
-          <text>去剪辑</text>
+          <text>音乐剪辑</text>
+        </view>
+        <view class="utility-actions-row">
+          <view class="utility-action-btn {{isSavedToLibrary ? 'saved' : ''}}" bindtap="onSaveToLibrary" hover-class="btn-hover">
+            <text>{{isSavedToLibrary ? '已存入作品库' : '存入我的作品'}}</text>
+          </view>
+          <view class="utility-action-btn" bindtap="onShareLocalFile" hover-class="btn-hover">
+            <text>发给微信好友</text>
+          </view>
         </view>
         <view class="ghost-action" bindtap="onRestartRecord" hover-class="btn-hover">重新录制</view>
       </view>

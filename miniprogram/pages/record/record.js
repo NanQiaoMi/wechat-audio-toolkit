@@ -11,6 +11,7 @@
 
 const recordAudio = require('../../utils/record-audio.js');
 const haptics = require('../../utils/haptics.js');
+const libraryStore = require('../../utils/library-store.js');
 
 // ---- 录音参数契约（原生 PCM 实时流采集，支持 100% 真实物理声波计算）----
 const RECORD_OPTIONS = {
@@ -155,6 +156,7 @@ Page({
 
     // 来源：index | editor（决定「完成」后的默认去向提示）
     fromSource: 'index',
+    isSavedToLibrary: false,
   },
 
   // ============================================================
@@ -1052,6 +1054,7 @@ Page({
       previewDuration: 0,
       previewCurrentText: '00:00',
       previewDurationText: '00:00',
+      isSavedToLibrary: false,
     });
     if (this.audioCtx) {
       try {
@@ -1175,6 +1178,79 @@ Page({
         });
       },
     });
+  },
+
+  onSaveToLibrary() {
+    if (this.data.status !== 'review') return;
+    if (this.data.isSavedToLibrary) {
+      wx.showToast({ title: '已在作品库中', icon: 'none' });
+      return;
+    }
+    const path = this.data.tempFilePath;
+    if (!this.isTempFileAlive(path)) {
+      wx.showToast({ title: '录音文件已失效', icon: 'none' });
+      return;
+    }
+
+    try {
+      const item = libraryStore.itemFromRecord({
+        name: this.data.fileName,
+        path: path,
+        tempFilePath: path,
+        size: this.data.fileSize,
+        sizeText: this.data.sizeText,
+        durationSec: this.data.durationSec,
+        durationText: this.data.durationText,
+      });
+      libraryStore.addItem(item);
+      this.setData({ isSavedToLibrary: true });
+      haptics.notificationSuccess();
+      wx.showToast({ title: '已存入我的作品', icon: 'success' });
+    } catch (e) {
+      console.warn('[record] 保存至作品库失败:', e);
+      wx.showToast({ title: '保存失败，请重试', icon: 'none' });
+    }
+  },
+
+  onShareLocalFile() {
+    if (this.data.status !== 'review') return;
+    const path = this.data.tempFilePath;
+    if (!this.isTempFileAlive(path)) {
+      wx.showToast({ title: '录音文件已失效', icon: 'none' });
+      return;
+    }
+
+    const fileName = this.data.fileName || '现场录音.mp3';
+    if (typeof wx !== 'undefined' && typeof wx.shareFileMessage === 'function') {
+      wx.shareFileMessage({
+        filePath: path,
+        fileName: fileName,
+        success: () => {
+          haptics.notificationSuccess();
+          wx.showToast({ title: '已发送，可长按聊天记录保存', icon: 'none' });
+        },
+        fail: (err) => {
+          if (err && (err.errMsg || '').includes('cancel')) return;
+          if (wx.saveFileToDisk) {
+            wx.saveFileToDisk({
+              filePath: path,
+              fileName: fileName,
+              success: () => wx.showToast({ title: '已保存到本地磁盘', icon: 'success' }),
+              fail: () => wx.showToast({ title: '未能调起转发，可点「去转换」或「去剪辑」', icon: 'none' }),
+            });
+          }
+        },
+      });
+    } else if (typeof wx !== 'undefined' && typeof wx.saveFileToDisk === 'function') {
+      wx.saveFileToDisk({
+        filePath: path,
+        fileName: fileName,
+        success: () => wx.showToast({ title: '已保存到本地磁盘', icon: 'success' }),
+        fail: () => wx.showToast({ title: '未能保存，可点「去转换」', icon: 'none' }),
+      });
+    } else {
+      wx.showToast({ title: '可点击「去转换」或「去剪辑」导出', icon: 'none' });
+    }
   },
 
   // 页面卸载时静默停止录音（不发提示、不进入 REVIEW）
