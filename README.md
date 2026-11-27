@@ -94,7 +94,7 @@ flowchart LR
     ClipFX --> Concat["concat 时序拼接"]
     Concat --> Duck["多轨混音与<br/>Auto-Ducking 人声避让"]
     Duck --> Master["全局增益 + alimiter 防破音限幅"]
-    Master --> Out["输出 MP3/WAV/M4A<br/>写入 24h 作品库"]
+    Master --> Out["输出 MP3 (64k~320k)<br/>写入 24h 作品库"]
 ```
 
 ---
